@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="docx-page-size" content="A4">
+  <title>玄学疗愈 App · 项目开发规范</title>
+  <style>
+  :root {
+    --fs-h1: var(--typography-fontSize-h1, 18pt);
+    --fs-h2: var(--typography-fontSize-h2, 15pt);
+    --fs-h3: var(--typography-fontSize-h3, 13pt);
+    --fs-h4: var(--typography-fontSize-h4, 12pt);
+    --fs-body: var(--typography-fontSize-body, 11pt);
+    --fs-small: var(--typography-fontSize-small, 9pt);
+    --ff-heading: var(--typography-fontFamily-heading, "黑体", SimHei, sans-serif);
+    --ff-body: var(--typography-fontFamily-body, "宋体", SimSun, serif);
+    --lh-body: var(--typography-lineHeight-body, 1.7);
+    --lh-heading: var(--typography-lineHeight-heading, 1.3);
+    --fw-bold: 600;
+    --fw-normal: 400;
+    --color-primary: #2563EB;
+    --color-text: #111827;
+    --color-muted: #6B7280;
+    --color-border: #E5E7EB;
+    --color-bg: #FFFFFF;
+    --color-highlight: #F3F4F6;
+    --spacing-paragraph: 0.5em;
+    --spacing-section: 1.6em;
+    --spacing-block: 1em;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--ff-body);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--color-text);
+    background: var(--color-bg);
+    max-width: 15.6cm;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--ff-heading);
+    line-height: var(--lh-heading);
+    font-weight: var(--fw-bold);
+    color: var(--color-text);
+    margin-top: var(--spacing-section);
+    margin-bottom: var(--spacing-paragraph);
+  }
+  h1 { font-size: var(--fs-h1); }
+  h2 { font-size: var(--fs-h2); }
+  h3 { font-size: var(--fs-h3); }
+  h4 { font-size: var(--fs-h4); }
+
+  p { margin-bottom: var(--spacing-paragraph); }
+
+  ul, ol { padding-left: 2em; margin-bottom: var(--spacing-paragraph); }
+  li { margin-bottom: 0.3em; }
+
+  table { border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-block); }
+  th, td { padding: 0.5em 0.8em; border: 1px solid var(--color-border); font-size: var(--fs-body); }
+  th { font-weight: var(--fw-bold); background: var(--color-highlight); }
+
+  /* Cover */
+  .cover-eyebrow { font-family: var(--ff-heading); font-size: var(--fs-small); color: var(--color-primary); text-align: center; margin-top: 6em; margin-bottom: 1.2em; }
+  .cover-title { font-family: var(--ff-heading); font-size: 28pt; font-weight: 700; text-align: center; color: var(--color-text); margin-top: 0.5em; margin-bottom: 0.6em; line-height: 1.4; }
+  .cover-subtitle { font-family: var(--ff-heading); font-size: var(--fs-h2); text-align: center; color: var(--color-muted); margin-bottom: 3em; }
+  .cover-meta { font-size: var(--fs-small); color: var(--color-muted); text-align: center; margin-top: 6em; line-height: 1.8; }
+
+  /* TOC */
+  .doc-toc { margin-bottom: var(--spacing-section); padding: 1em; background: var(--color-highlight); }
+  .toc-title { font-family: var(--ff-heading); font-weight: var(--fw-bold); margin-bottom: 0.5em; font-size: var(--fs-h3); }
+  .toc-list, .toc-list ol, .toc-list ul { list-style: none; list-style-type: none; padding-left: 1.2em; }
+  .toc-list li { margin-bottom: 0.35em; }
+  .toc-list a { color: var(--color-text); text-decoration: none; }
+</style>
+</head>
+<body>
+  <section role="cover">
+    <p class="cover-eyebrow">PRODUCT DEVELOPMENT SPECIFICATION</p>
+    <h1 class="cover-title">玄学疗愈 App<br>项目开发规范</h1>
+    <p class="cover-subtitle">需求 · 技术 · 设计 · 执行步骤 · 项目管理</p>
+    <p class="cover-meta">版本 V1.0<br>2026 年 9 月</p>
+  </section>
+
+  <section role="body" data-page-restart="1">
+    <nav class="doc-toc" aria-label="文档目录">
+      <p class="toc-title">目录</p>
+      <ol class="toc-list">
+        <li><a href="#section-1">一、产品概述</a></li>
+        <li><a href="#section-2">二、功能范围</a></li>
+        <li><a href="#section-3">三、技术方案</a></li>
+        <li><a href="#section-4">四、设计规范</a></li>
+        <li><a href="#section-5">五、商业模式</a></li>
+        <li><a href="#section-6">六、执行步骤（开发路线图）</a></li>
+        <li><a href="#section-7">七、合规红线</a></li>
+        <li><a href="#section-8">八、项目管理约定</a></li>
+        <li><a href="#section-9">附录 · 预算估算</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="section-1">一、产品概述</h2>
+    <p>玄学疗愈 App 是一款面向 20–35 岁年轻女性的自我关怀产品，融合「玄学命理」与「显化疗愈」两大方向，帮助用户在不确定中找回内在安定、希望与行动力。</p>
+    <p>产品采用「微信小程序 + 手机 App」双端形态，分阶段推进：先做微信小程序快速验证需求，再扩展 iOS + Android 原生 App，最终引入真人咨询师。</p>
+
+    <h2 id="section-2">二、功能范围</h2>
+    <h3>（一）主要功能（优先开发）</h3>
+    <p><strong>1. 许愿显化 + 每日肯定语 + 今日 Tips</strong></p>
+    <ul>
+      <li>用户创建愿望（目标、期限、分类），每日打卡记录显化进度。</li>
+      <li>每日推送一条基于「愿望 + 命理画像 + 当日流日」生成的肯定语。</li>
+      <li>每日推送一条「今日 Tips」，分类涵盖情绪、人际、事业、健康等。</li>
+    </ul>
+    <p><strong>2. 定制高能量音乐（Sub）+ 经文</strong></p>
+    <ul>
+      <li>用户按目标（显化什么）、频率（432Hz / 528Hz 等）、时长定制专属 sub 音乐。</li>
+      <li>支持叠加经文诵读（经文数据库后续提供）。</li>
+      <li>内置音乐库，按目标与频率分类浏览、试听、收藏。</li>
+    </ul>
+    <h3>（二）次要功能（后续开发）</h3>
+    <ul>
+      <li><strong>命理分析</strong>：八字、紫微斗数（东玄）、星盘（西玄），每日推送注意事项。</li>
+      <li><strong>塔罗电子抽牌</strong>：78 张塔罗牌，多种牌阵，AI 生成牌义解读，每日一牌。</li>
+    </ul>
+
+    <h2 id="section-3">三、技术方案</h2>
+    <h3>（一）跨端框架</h3>
+    <ul>
+      <li>小程序：微信原生或 uni-app。</li>
+      <li>App：uni-app / Flutter（一套代码多端，成本最低）。</li>
+    </ul>
+    <h3>（二）后端与数据</h3>
+    <p>云服务（微信云开发 / 腾讯云 / 阿里云），存储用户、命理、订单数据。</p>
+    <h3>（三）AI 能力</h3>
+    <p>接入大模型 API，生成肯定语、命理 / 塔罗解读、个性化 tips。</p>
+    <h3>（四）排盘算法</h3>
+    <p>八字 / 紫微 / 星盘使用成熟开源库（Python 排盘库、Swiss Ephemeris 星历），无需自研。</p>
+    <h3>（五）音频生成</h3>
+    <p>AI 音乐生成 + TTS（经文诵读）混音，叠加频率与白噪音。</p>
+    <h3>（六）推送</h3>
+    <p>小程序订阅消息 / App 本地通知。</p>
+
+    <h2 id="section-4">四、设计规范</h2>
+    <h3>（一）视觉调性</h3>
+    <ul>
+      <li>面向年轻女性疗愈用户，整体温柔治愈风。</li>
+      <li>配色以柔和暖色为主，弱化玄学的「神秘沉重感」，突出「轻盈、安定、希望」。</li>
+    </ul>
+    <h3>（二）信息架构（4 个主 Tab）</h3>
+    <table>
+      <thead>
+        <tr><th>Tab</th><th>内容</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>首页</td><td>今日肯定语、今日 Tips、每日一牌、快捷入口</td></tr>
+        <tr><td>音乐</td><td>定制 sub、音乐库、经文诵读</td></tr>
+        <tr><td>命理</td><td>八字 / 紫微 / 星盘排盘、每日注意事项</td></tr>
+        <tr><td>我的</td><td>愿望清单、显化打卡、会员、订单、设置</td></tr>
+      </tbody>
+    </table>
+    <h3>（三）关键交互原则</h3>
+    <ul>
+      <li>许愿与打卡要轻量、有仪式感、可即时获得正向反馈。</li>
+      <li>音乐播放器支持循环、定时关闭、收藏。</li>
+    </ul>
+
+    <h2 id="section-5">五、商业模式</h2>
+    <p>采用「免费 + 单次付费 + 会员订阅 + 广告 + 邀请奖励」的混合变现。</p>
+    <h3>（一）会员定价</h3>
+    <table>
+      <thead>
+        <tr><th>档位</th><th>价格</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>月度会员</td><td>¥12.8–18.8</td></tr>
+        <tr><td>季度会员</td><td>¥35–52</td></tr>
+        <tr><td>年度会员</td><td>¥98–128</td></tr>
+      </tbody>
+    </table>
+    <p>会员权益：全部音乐库、深度命理报告、全部牌阵、免广告（不含高端定制专属 sub）。</p>
+    <h3>（二）单次付费 · 高端定制</h3>
+    <ul>
+      <li>定制专属 sub 音乐 ¥19.9–49.9 / 首，深度命理报告 ¥39–99 / 份，特殊牌阵、合盘。</li>
+      <li>高端定制独立于会员，会员也需单独购买。</li>
+    </ul>
+    <h3>（三）邀请奖励（用户增长）</h3>
+    <ul>
+      <li>邀请新用户注册即赠免费使用次数（抽牌 / 深度解读 / 音乐试听等）。</li>
+      <li>被邀请人产生消费后，邀请人获消费返现：起始比例 3%，当邀请人数超过 3 人后，被邀请人之后新产生的消费返现比例提升至 5%（历史已结算部分不追溯补差）。</li>
+      <li>返现可用于抵扣会员费或余额消费，MVP 阶段暂不开通现金提现。</li>
+    </ul>
+
+    <h2 id="section-6">六、执行步骤（开发路线图）</h2>
+    <p>分四步走：先合规、再小程序、再留存、再原生 App。</p>
+    <h3>（一）阶段 0 · 合规准备（先行）</h3>
+    <p>定位表述、免责声明、隐私政策、内容合规红线（详见第七节）。</p>
+    <h3>（二）阶段 1 · MVP 微信小程序（1–2 个月）</h3>
+    <p>每日肯定语推送 + 定制 sub 音乐 + 每日一牌 + 基础八字 / 星座分析；免费 + 单次付费，验证需求。</p>
+    <h3>（三）阶段 2 · 完善与留存（3–6 个月）</h3>
+    <p>完整命理排盘（紫微）、塔罗多牌阵、会员体系、广告接入、分享裂变。</p>
+    <h3>（四）阶段 3 · 原生 App（6–12 个月）</h3>
+    <p>iOS + Android，账号数据打通；经合规评估后引入真人命理师 / 塔罗师（连麦 / 1v1）。</p>
+
+    <h2 id="section-7">七、合规红线</h2>
+    <ol>
+      <li><strong>定位表述</strong>：整体定位为「文化娱乐 / 心理安抚 / 自我成长」，避免「算命、预测吉凶、改运」等迷信化表述。</li>
+      <li><strong>免责声明</strong>：所有测算与解读标注「仅供文化娱乐参考，不构成任何医疗 / 投资 / 决策建议」。</li>
+      <li><strong>宗教内容</strong>：引入经文需关注《互联网宗教信息服务管理办法》，建议以「传统文化诵读」形式呈现。</li>
+      <li><strong>广告与功效</strong>：不夸大音乐 / 塔罗的「疗效」，不承诺结果。</li>
+      <li><strong>真人咨询（后期）</strong>：达人资质审核、杜绝诱导高额消费，设置消费上限与退款机制。</li>
+      <li><strong>用户数据</strong>：出生信息、愿望等属敏感信息，需隐私合规（隐私政策、脱敏存储）。</li>
+    </ol>
+
+    <h2 id="section-8">八、项目管理约定</h2>
+    <h3>（一）目录结构</h3>
+    <ul>
+      <li>「每日开发日志」—— 按日期记录进度（YYYY-MM-DD.md）。</li>
+      <li>「待办事项」—— 开发待办清单。</li>
+      <li>「设计规范」—— UI 规范、视觉稿。</li>
+    </ul>
+    <h3>（二）记录规则</h3>
+    <ul>
+      <li>每日开发结束后，在「每日开发日志」新建当日文件，记录完成项、遗留问题与明日计划。</li>
+      <li>待办清单的每一项完成后更新状态。</li>
+    </ul>
+    <h3>（三）待用户确认事项</h3>
+    <ul>
+      <li>最终产品名。</li>
+      <li>经文数据库的格式与体量。</li>
+      <li>预算上限与期望上线时间。</li>
+      <li>邀请奖励免费次数的具体额度。</li>
+    </ul>
+
+    <h2 id="section-9">附录 · 预算估算</h2>
+    <table>
+      <thead>
+        <tr><th>项目</th><th>预算区间</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>MVP 小程序</td><td>¥5–15 万</td></tr>
+        <tr><td>完整版 + 原生 App</td><td>¥30–80 万</td></tr>
+        <tr><td>持续投入</td><td>服务器、AI 调用、音乐 / 卡面 / 经文制作</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

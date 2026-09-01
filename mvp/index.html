@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#faf7f2">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
+  <title>光屿 · 玄学疗愈</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark">✦</span>
+        <span class="brand-name">光屿</span>
+      </div>
+      <div class="topbar-actions">
+        <span class="date-label" id="todayLabel"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="app">
+    <!-- 页面：首页 -->
+    <section class="page active" id="page-home">
+      <!-- 今日肯定语卡片 -->
+      <div class="card affirmation-card">
+        <div class="card-tag">今日肯定语</div>
+        <p class="affirmation-text" id="affirmationText">加载中…</p>
+        <p class="affirmation-source" id="affirmationSource" style="display:none;"></p>
+        <div class="affirmation-actions">
+          <button class="btn btn-ghost btn-sm" id="refreshAffirmation">换一条</button>
+          <button class="btn btn-ghost btn-sm" id="saveAffirmation">收藏</button>
+        </div>
+      </div>
+
+      <!-- 今日 Tips -->
+      <div class="card tip-card">
+        <div class="card-tag">今日小 Tips</div>
+        <p class="tip-text" id="tipText">加载中…</p>
+      </div>
+
+      <!-- 快速入口 -->
+      <div class="quick-grid">
+        <button class="quick-item" data-nav="wish">
+          <span class="quick-icon">🌙</span>
+          <span class="quick-label">许愿</span>
+        </button>
+        <button class="quick-item" data-nav="music">
+          <span class="quick-icon">🎧</span>
+          <span class="quick-label">定制音乐</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 页面：许愿显化 -->
+    <section class="page" id="page-wish">
+      <div class="page-head">
+        <button class="btn-back" data-nav="home">‹</button>
+        <h2 class="page-title">我的心愿</h2>
+        <button class="btn btn-primary" id="btnNewWish" style="padding:8px 12px;font-size:18px;line-height:1;" title="许下心愿">+</button>
+      </div>
+
+      <div class="wish-list" id="wishList"></div>
+      <div class="empty-state" id="wishEmpty">
+        <p class="empty-icon">🕯️</p>
+        <p>还没有愿望，许下你的第一个心愿吧</p>
+      </div>
+    </section>
+
+    <!-- 页面：定制音乐 -->
+    <section class="page" id="page-music">
+      <div class="page-head">
+        <button class="btn-back" data-nav="home">‹</button>
+        <h2 class="page-title">定制音乐</h2>
+      </div>
+
+      <!-- 定制流程 -->
+      <div class="card">
+        <div class="card-tag">定制你的高能量 Sub</div>
+        <form id="musicForm" class="music-form">
+          <div class="form-group">
+            <label>显化目标</label>
+            <div class="chip-group" id="goalChips">
+              <button type="button" class="chip active" data-goal="爱情">爱情</button>
+              <button type="button" class="chip" data-goal="财富">财富</button>
+              <button type="button" class="chip" data-goal="健康">健康</button>
+              <button type="button" class="chip" data-goal="内在平静">内在平静</button>
+              <button type="button" class="chip" data-goal="事业">事业</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>愿望提示词（告诉 AI 你想要什么）</label>
+            <textarea id="wishPrompt" rows="2" maxlength="100" placeholder="例如：今年存下 20 万 / 想遇到对的人 / 想睡个好觉… AI 会为你自动匹配目标、风格和特效音"></textarea>
+          </div>
+          <div class="form-group">
+            <label>能量频率</label>
+            <div class="chip-group" id="freqChips">
+              <button type="button" class="chip active" data-freq="432">432 Hz</button>
+              <button type="button" class="chip" data-freq="528">528 Hz</button>
+              <button type="button" class="chip" data-freq="639">639 Hz</button>
+              <button type="button" class="chip" data-freq="741">741 Hz</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>伴奏风格</label>
+            <div class="chip-group" id="styleChips">
+              <button type="button" class="chip active" data-style="auto">AI 自动匹配</button>
+              <button type="button" class="chip" data-style="浪漫流行">浪漫流行</button>
+              <button type="button" class="chip" data-style="轻快民谣">轻快民谣</button>
+              <button type="button" class="chip" data-style="空灵氛围">空灵氛围</button>
+              <button type="button" class="chip" data-style="钢琴叙事">钢琴叙事</button>
+              <button type="button" class="chip" data-style="温暖治愈">温暖治愈</button>
+              <button type="button" class="chip" data-style="清新流行">清新流行</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>氛围特效音（可多选）</label>
+            <div class="chip-group" id="fxChips">
+              <button type="button" class="chip" data-fx="rain">🌧️ 细雨</button>
+              <button type="button" class="chip" data-fx="waves">🌊 海浪</button>
+              <button type="button" class="chip" data-fx="stream">🏞️ 溪流</button>
+              <button type="button" class="chip" data-fx="fire">🔥 篝火</button>
+              <button type="button" class="chip" data-fx="birds">🐦 鸟鸣</button>
+              <button type="button" class="chip" data-fx="chime">🎐 风铃</button>
+              <button type="button" class="chip" data-fx="coins">🪙 金币</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>时长</label>
+            <div class="chip-group" id="durChips">
+              <button type="button" class="chip" data-dur="5">5 分钟</button>
+              <button type="button" class="chip active" data-dur="10">10 分钟</button>
+              <button type="button" class="chip" data-dur="15">15 分钟</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>给这段音乐取名（可选）</label>
+            <input type="text" id="musicName" placeholder="例如：睡前显化 · 爱情" maxlength="30">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="btnGenerate">生成我的定制音乐</button>
+        </form>
+      </div>
+
+      <!-- 生成结果 / 播放器（带主题动态背景） -->
+      <div class="card player-card" id="playerCard" style="display:none;">
+        <div class="theme-bg" aria-hidden="true">
+          <canvas class="theme-fx"></canvas>
+          <span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span>
+        </div>
+        <div class="player-inner">
+          <div class="player-visual" id="playerVisual" title="点击进入沉浸模式">✦</div>
+          <div class="player-title" id="playerTitle">定制音乐</div>
+          <div class="player-sub" id="playerSub"></div>
+          <div class="player-controls">
+            <button class="btn btn-primary" id="btnPlayPause">播放</button>
+            <button class="btn btn-ghost" id="btnDownload">下载</button>
+            <button class="btn btn-ghost" id="btnImmersive">沉浸</button>
+          </div>
+          <p class="player-note" id="playerNote"></p>
+        </div>
+      </div>
+
+      <!-- 我的伴奏（导入 AI 生成或下载的本地音乐） -->
+      <div class="card">
+        <div class="card-tag">🎵 我的伴奏（导入本地音乐）</div>
+        <p class="upload-hint">把 AI 生成或下载的 mp3 上传到这里，作为定制 sub 的伴奏，随点随播、循环播放。</p>
+        <div class="form-group">
+          <label>伴奏主题</label>
+          <div class="chip-group" id="importGoalChips">
+            <button type="button" class="chip active" data-goal="爱情">爱情</button>
+            <button type="button" class="chip" data-goal="财富">财富</button>
+            <button type="button" class="chip" data-goal="健康">健康</button>
+            <button type="button" class="chip" data-goal="内在平静">内在平静</button>
+            <button type="button" class="chip" data-goal="事业">事业</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-block" id="btnImportMusic">＋ 上传音乐文件</button>
+        <input type="file" id="importFileInput" accept="audio/*,.mp3,.wav,.m4a,.ogg" multiple style="display:none;">
+        <div class="music-list" id="importList"></div>
+      </div>
+
+      <!-- 音乐库 -->
+      <div class="card">
+        <div class="card-tag">音乐库（预设）</div>
+        <div class="music-list" id="musicList"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部 Tab 栏 -->
+  <nav class="tabbar">
+    <button class="tab-item active" data-nav="home">
+      <span class="tab-icon">✦</span>
+      <span class="tab-label">今日</span>
+    </button>
+    <button class="tab-item" data-nav="wish">
+      <span class="tab-icon">🌙</span>
+      <span class="tab-label">许愿</span>
+    </button>
+    <button class="tab-item" data-nav="music">
+      <span class="tab-icon">🎧</span>
+      <span class="tab-label">音乐</span>
+    </button>
+  </nav>
+
+  <!-- 许愿弹窗 -->
+  <div class="modal" id="wishModal" style="display:none;">
+    <div class="modal-mask" data-close="wishModal"></div>
+    <div class="modal-body">
+      <div class="modal-head">
+        <h3 id="wishModalTitle">许下心愿</h3>
+        <button class="modal-close" data-close="wishModal">✕</button>
+      </div>
+      <form id="wishForm">
+        <div class="form-group">
+          <label>你的愿望</label>
+          <input type="text" id="wishText" placeholder="例如：今年遇到互相喜欢的人" maxlength="60" required>
+        </div>
+        <div class="form-group">
+          <label>愿望分类</label>
+          <div class="chip-group" id="wishCatChips">
+            <button type="button" class="chip active" data-cat="爱情">爱情</button>
+            <button type="button" class="chip" data-cat="事业">事业</button>
+            <button type="button" class="chip" data-cat="财富">财富</button>
+            <button type="button" class="chip" data-cat="健康">健康</button>
+            <button type="button" class="chip" data-cat="成长">成长</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>期望期限（可选）</label>
+          <input type="date" id="wishDeadline">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">保存愿望</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 沉浸模式 / 播放屏保（全屏纯净主题图，无文字遮挡；点按屏幕唤出控件，3 秒后自动隐藏） -->
+  <div class="screensaver" id="screensaver" style="display:none;">
+    <div class="theme-bg" aria-hidden="true">
+      <canvas class="theme-fx"></canvas>
+      <span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span><span class="orb o4"></span>
+    </div>
+    <div class="ss-content">
+      <div class="ss-controls">
+        <button class="btn btn-primary" id="btnSsPlay">暂停</button>
+        <button class="btn btn-ghost" id="btnSsClose">退出沉浸</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div class="toast" id="toast"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
