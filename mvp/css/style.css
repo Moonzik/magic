@@ -7,6 +7,7 @@
   --brand: #c9a5d6;      /* 温柔紫 */
   --brand-deep: #a67bb8;
   --brand-soft: #f0e7f5;
+  --accent: #a67bb8;     /* 强调色（经文高亮 / 开关） */
   --gold: #d4b483;
   --gold-soft: #f7efe0;
   --rose: #e0a3b0;
@@ -324,6 +325,39 @@ body { padding-bottom: 80px; }
 .ss-content.hide { opacity: 0; pointer-events: none; }
 .ss-controls { display: flex; justify-content: center; gap: 12px; }
 
+/* 沉浸模式经文（居中、逐行呼吸式高亮） */
+.ss-scripture {
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  padding: 0 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  max-height: 72%;
+  overflow: hidden;
+  text-align: center;
+  pointer-events: none;
+}
+.ss-scripture .sr-line {
+  font-size: 20px;
+  line-height: 1.8;
+  letter-spacing: 0.5px;
+  color: var(--ink);
+  opacity: 0.32;
+  transition: opacity 0.7s ease, transform 0.7s ease, color 0.7s ease;
+}
+.ss-scripture .sr-line.sr-active {
+  opacity: 1;
+  transform: scale(1.05);
+  color: var(--brand-deep);
+  font-weight: 500;
+}
+
 .player-visual {
   width: 72px; height: 72px;
   margin: 0 auto 12px;
@@ -340,6 +374,85 @@ body { padding-bottom: 80px; }
 .player-controls { display: flex; justify-content: center; gap: 12px; margin-top: 16px; }
 .player-note { font-size: 12px; color: var(--ink-faint); margin-top: 12px; }
 .player-visual.playing { animation-duration: 1.2s; }
+
+/* ===== 经文伴读 ===== */
+.toggle-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--ink-soft);
+  padding: 4px 2px 12px; cursor: pointer; user-select: none;
+}
+.toggle-row input { width: 16px; height: 16px; accent-color: var(--accent); flex: none; }
+.scripture-box {
+  margin-top: 14px; padding: 14px 14px 12px;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid var(--line); border-radius: 14px;
+  text-align: left;
+}
+.scripture-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.scripture-title { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.scripture-text { font-size: 14px; line-height: 2; color: var(--ink); }
+.scripture-text .sr-line { transition: color .3s, opacity .3s, transform .3s; opacity: .5; }
+.scripture-text .sr-line.sr-active { opacity: 1; color: var(--accent); font-weight: 600; transform: translateX(2px); }
+
+/* ===== 塔罗 · 牌阵解读 ===== */
+.tarot-tip { font-size: 12px; color: var(--ink-soft); text-align: center; margin: 10px 0 0; }
+.tarot-question { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 14px; color: var(--ink); background: #fff; resize: none; box-sizing: border-box; }
+.tarot-question:focus { outline: none; border-color: var(--accent); }
+.spread-chips { display: flex; flex-direction: column; gap: 8px; }
+.spread-chip { border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 13px; color: var(--ink-soft); cursor: pointer; text-align: left; transition: all .15s ease; }
+.spread-chip.active { border-color: var(--accent); background: #f6ecfb; color: var(--ink); font-weight: 600; }
+.tarot-positions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
+.tarot-pos { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.tarot-pos-label { font-size: 12px; color: var(--gold); letter-spacing: 1px; font-weight: 600; }
+.tarot-card-wrap { width: 100%; display: flex; justify-content: center; perspective: 600px; }
+.tarot-card-wrap.flip { animation: tarotFlip .55s ease; }
+.tarot-down {
+  width: 100%; aspect-ratio: 5 / 7; border-radius: 10px; cursor: pointer;
+  background: linear-gradient(150deg, #b89ad0, #8a6fb0);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(138,111,176,.28); border: 1px solid rgba(255,255,255,.4);
+  font-size: 20px;
+}
+.tarot-down:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(138,111,176,.35); }
+.tarot-down:active { transform: scale(.96); }
+.tarot-up { width: 100%; cursor: zoom-in; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.tarot-up .tarot-svg { width: 86px; height: auto; display: block; filter: drop-shadow(0 4px 10px rgba(138,111,176,.25)); border-radius: 10px; }
+.tarot-up-name { font-size: 11px; color: var(--ink-soft); text-align: center; }
+.tarot-up-name .orient { color: var(--accent); font-weight: 700; }
+.tarot-up-name .orient.rev { color: #c9893f; }
+.tarot-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+.tarot-read-card { display: none; }
+.tarot-big-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 6px 0 12px; }
+.tarot-big { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.tarot-big-svg .tarot-svg { width: 110px; height: auto; display: block; filter: drop-shadow(0 6px 14px rgba(138,111,176,.3)); border-radius: 12px; }
+.tarot-big-role { font-size: 12px; color: var(--gold); font-weight: 700; }
+.tarot-big-name { font-size: 12px; color: var(--ink-soft); text-align: center; }
+.tarot-big-name .orient { color: var(--accent); font-weight: 700; }
+.tarot-big-name .orient.rev { color: #c9893f; }
+.tarot-reading { font-size: 13px; line-height: 1.8; color: var(--ink-soft); }
+.tarot-reading p { margin: 0 0 8px; }
+.tarot-lightbox { position: fixed; inset: 0; background: rgba(40,28,20,.7); display: none; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
+.lb-body { background: #fff; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 90%; }
+.lb-body .tarot-svg { width: 220px; height: auto; display: block; }
+.lb-name { font-size: 14px; font-weight: 700; color: var(--ink); }
+@keyframes tarotFlip { 0% { transform: rotateY(90deg); opacity: .2; } 100% { transform: rotateY(0); opacity: 1; } }
+@keyframes tarotIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* 抽牌阶段：78 张卡背网格 + 进度 */
+.tarot-progress { margin: 6px 0 10px; }
+.tarot-progress-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.tarot-progress-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--brand), var(--brand-deep)); border-radius: 3px; transition: width .35s ease; }
+.tarot-progress-label { font-size: 12px; color: var(--ink-soft); margin-top: 6px; text-align: center; }
+.tarot-deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; margin-top: 6px; }
+.tarot-deck-card { position: relative; border: none; background: none; padding: 0; cursor: pointer; border-radius: 7px; aspect-ratio: 180 / 300; overflow: hidden; transition: transform .12s ease, box-shadow .12s ease; }
+.tarot-deck-card:hover { transform: translateY(-2px); }
+.tarot-deck-card:active { transform: scale(.94); }
+.tarot-deck-back { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(160deg, #6a4f8f, #4a3568); border: 1px solid #8a6fb0; border-radius: 7px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.12); }
+.tarot-deck-mark { color: #e9c39a; font-size: 15px; opacity: .9; }
+.tarot-deck-card.drawn { cursor: default; }
+.tarot-deck-card .tarot-svg { width: 100%; height: auto; display: block; border-radius: 7px; filter: drop-shadow(0 3px 8px rgba(138,111,176,.3)); }
+.tarot-deck-check { position: absolute; top: 3px; right: 3px; width: 17px; height: 17px; line-height: 17px; text-align: center; border-radius: 50%; background: var(--brand-deep); color: #fff; font-size: 11px; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+
 
 /* ===== 音乐库列表 ===== */
 .music-item {
@@ -365,6 +478,23 @@ body { padding-bottom: 80px; }
 .upload-hint { font-size: 12px; color: var(--ink-faint); margin: 0 0 12px; line-height: 1.5; }
 .empty-hint { font-size: 13px; color: var(--ink-faint); text-align: center; padding: 16px 0; }
 .del-import { flex-shrink: 0; color: var(--ink-faint); }
+
+/* ===== 伴奏库（搜索 / 筛选 / 分组） ===== */
+.lib-tools { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; }
+.lib-search {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg);
+}
+.lib-search:focus { outline: none; border-color: var(--brand); }
+.lib-filter { flex-wrap: wrap; }
+.lib-section { margin-top: 14px; }
+.lib-section-title { font-size: 13px; font-weight: 700; color: var(--ink-soft); margin: 6px 0 2px; }
+.lib-empty { font-size: 13px; color: var(--ink-faint); padding: 10px 0; text-align: center; }
 
 /* ===== 底部 Tab ===== */
 .tabbar {
@@ -437,3 +567,48 @@ body { padding-bottom: 80px; }
   pointer-events: none;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== 命理 / 八字 ===== */
+.fate-result { animation: fadeIn .3s ease; }
+.fate-pillars { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0 14px; }
+.fate-pillar {
+  flex: 1;
+  text-align: center;
+  background: var(--brand-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px 4px;
+}
+.fate-col-label { font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
+.fate-gz { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.fate-gan { font-size: 28px; font-weight: 600; color: var(--brand-deep); line-height: 1; }
+.fate-zhi { font-size: 22px; color: var(--ink); line-height: 1; }
+.fate-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.fate-row:first-of-type { border-top: none; }
+.fate-k { color: var(--ink-soft); font-size: 14px; }
+.fate-v { font-weight: 600; font-size: 15px; }
+.fate-elements { margin-top: 14px; }
+.fate-elements-title { font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; }
+.wu-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.wu-name { width: 20px; font-size: 14px; color: var(--ink); text-align: center; flex: none; }
+.wu-track { flex: 1; height: 10px; background: rgba(0,0,0,.06); border-radius: 6px; overflow: hidden; }
+.wu-fill { display: block; height: 100%; border-radius: 6px; transition: width .4s ease; }
+.wu-cnt { width: 16px; text-align: right; font-size: 13px; color: var(--ink-soft); flex: none; }
+.fate-note {
+  margin-top: 16px;
+  background: var(--brand-soft);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.fate-note p { margin: 5px 0; }
+.fate-line { color: var(--ink); }
+.fate-strength { color: var(--brand-deep); font-weight: 600; }
+.fate-yong { color: var(--ink-soft); }
+.fate-disclaimer { font-size: 11px; color: var(--ink-soft); margin-top: 14px; line-height: 1.6; }

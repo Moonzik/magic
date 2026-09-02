@@ -100,3 +100,393 @@ const GOAL_META = {
   '内在平静': { icon: '🌙', tip: '内心的湖面，渐渐归于平静' },
   '事业': { icon: '🎯', tip: '清晰与专注，助你稳步向前' }
 };
+
+// 高能量经文（原创、通用灵性语调，按目标分组；每段为分行数组，便于逐行高亮与朗读伴读）
+// 用途：定制音乐 / 预置曲 播放时可选「经文伴读」，随音乐循环诵读，强化显化。
+const SCRIPTURES_BY_GOAL = {
+  '爱情': [
+    [
+      '我首先，深深地爱着自己。',
+      '我的存在本身，就值得被珍惜。',
+      '当我好了，爱便自然流向我。',
+      '我敞开，也安心，等待刚刚好的相遇。'
+    ],
+    [
+      '我信任爱，也信任被爱。',
+      '我的心是温暖的房间，为对的人留着灯。',
+      '不必追赶，最好的正在路上。',
+      '我值得一段，轻松而长久的关系。'
+    ]
+  ],
+  '财富': [
+    [
+      '丰盛，是我本自具足的状态。',
+      '金钱如河水，自然流向松弛的我。',
+      '我允许自己，大大方方地拥有。',
+      '我越感恩，越看见，越多美好到来。'
+    ],
+    [
+      '我配得上富足，也接得住好运。',
+      '每一笔收入，都是宇宙温柔的回响。',
+      '我轻松创造，也轻松接收。',
+      '财富与我，本就是好朋友。'
+    ]
+  ],
+  '健康': [
+    [
+      '我的身体，正被温柔地照顾着。',
+      '每一次呼吸，都在带走疲惫。',
+      '我允许自己，好好休息与复原。',
+      '健康像光，一点点回到我身上。'
+    ],
+    [
+      '我听见身体的声音，也回应它。',
+      '细胞在更新，能量在回流。',
+      '我温柔对待自己，身体便回报以轻盈。',
+      '今天的我，比昨天更舒展。'
+    ]
+  ],
+  '内在平静': [
+    [
+      '我把念头，轻轻放在呼吸上。',
+      '外界喧嚣，内心自有湖泊。',
+      '我放下控制，只在此刻。',
+      '平静，是我随时可以回的家。'
+    ],
+    [
+      '不急，不争，不困。',
+      '允许一切发生，也允许一切流过。',
+      '我是观者，不是浪。',
+      '回到呼吸，便回到安宁。'
+    ]
+  ],
+  '事业': [
+    [
+      '我清楚自己要去哪里。',
+      '每一步，都算数。',
+      '我的专注，正在长成结果。',
+      '我值得，被看见与被认可。'
+    ],
+    [
+      '我不慌，节奏由我定。',
+      '困难是路，不是墙。',
+      '我的价值，不因一时起伏而改变。',
+      '稳稳向前，好事正在靠近。'
+    ]
+  ]
+};
+
+// 给定目标，按种子选一段经文（保证同目标每次可不同、可复现）
+function pickScripture(goal, seed) {
+  const arr = SCRIPTURES_BY_GOAL[goal];
+  if (!arr || !arr.length) return [];
+  const i = (Math.abs(seed | 0) || 0) % arr.length;
+  return arr[i];
+}
+
+// 罗马数字（牌面编号用）
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII'];
+// 大阿尔卡纳牌面中心符号（emoji 作焦点意象，配合矢量花边呈现塔罗牌质感）
+const MAJOR_EMOJI = ['🃏', '🪄', '🌙', '👑', '🏛️', '🔑', '💞', '🛡️', '🦁', '🏮', '🎡', '⚖️', '🙃', '💀', '🏺', '😈', '🗼', '⭐', '🌕', '☀️', '📯', '🌍'];
+// 塔罗 · 大阿尔卡纳 22 张（中文温柔指引，正位/逆位各一句，不宿命恐吓）
+const TAROT_MAJOR = [
+  { name: '愚者',   upright: '新的开始，带着信任勇敢迈出第一步。', reversed: '有些冲动或想逃避，先看清方向再行动。' },
+  { name: '魔术师', upright: '你已具备实现愿望的资源，动手去创造。', reversed: '潜力还在，先专注、别分散力气。' },
+  { name: '女祭司', upright: '答案在静默里，倾听你的直觉。', reversed: '想太多反而乱，给自己一点独处。' },
+  { name: '女皇',   upright: '丰盛与滋养正在靠近，好好照顾自己。', reversed: '忽略了自己的需要，先把自己填满。' },
+  { name: '皇帝',   upright: '稳定与秩序，按计划稳步推进。', reversed: '控制欲或混乱，找回节奏与边界。' },
+  { name: '教皇',   upright: '向有经验的人请教，传统方法也可靠。', reversed: '别被规则绑住，相信自己的判断。' },
+  { name: '恋人',   upright: '重要的连结或选择，跟随真心。', reversed: '关系或决定里有犹疑，看清真正想要的。' },
+  { name: '战车',   upright: '目标明确，专注向前就能赢。', reversed: '方向拉扯，先稳住再出发。' },
+  { name: '力量',   upright: '以柔克刚，温柔里藏着真正的力量。', reversed: '自我怀疑，先对自己温柔一点。' },
+  { name: '隐士',   upright: '独处与内省，会照见答案。', reversed: '孤立或迷失，适度向外联结。' },
+  { name: '命运之轮', upright: '转机到来，顺势而为。', reversed: '起伏难免，低谷也会过去。' },
+  { name: '正义',   upright: '因果清晰，公允对待自己与他人。', reversed: '回避责任或失衡，回到公平。' },
+  { name: '倒吊人', upright: '换个角度，停顿里自有领悟。', reversed: '固执或拖延，放下执念看新可能。' },
+  { name: '死神',   upright: '旧的一页翻过，新生正在酝酿。', reversed: '紧抓不放，允许结束发生。' },
+  { name: '节制',   upright: '平衡与调和，慢慢来最稳。', reversed: '失衡或极端，找回中道。' },
+  { name: '恶魔',   upright: '看见束缚，你有松开枷锁的自由。', reversed: '开始觉察执念，逐步解脱。' },
+  { name: '高塔',   upright: '突来的震动，打破旧的虚假安稳。', reversed: '余震未平，先稳住再重建。' },
+  { name: '星星',   upright: '希望与疗愈，前方有光。', reversed: '暂时的迷茫，别丢掉信心。' },
+  { name: '月亮',   upright: '迷雾之中，信任直觉而非恐惧。', reversed: '猜疑渐散，真相会浮现。' },
+  { name: '太阳',   upright: '明朗、喜悦与成功，尽情绽放。', reversed: '短暂的阴霾，光就在不远处。' },
+  { name: '审判',   upright: '觉醒与召唤，回应内心的声音。', reversed: '自我批判，先原谅再前行。' },
+  { name: '世界',   upright: '圆满达成，一个周期漂亮收尾。', reversed: '还差一步，补全它便圆满。' }
+];
+// 给大阿尔卡纳补上编号 / 罗马数字 / 牌面符号
+TAROT_MAJOR.forEach((c, i) => { c.num = i + 1; c.roman = ROMAN[c.num]; c.emoji = MAJOR_EMOJI[i]; });
+
+// 塔罗 · 小阿尔卡纳 56 张（4 花色 × 14 张）。正/逆位各一句温柔指引
+const TAROT_SUITS = [
+  { key: 'wands', name: '权杖', glyph: '🔥' },
+  { key: 'cups', name: '圣杯', glyph: '🍷' },
+  { key: 'swords', name: '宝剑', glyph: '🗡️' },
+  { key: 'pentacles', name: '星币', glyph: '🪙' }
+];
+const TAROT_RANKS = [
+  { r: 1, name: '王牌' }, { r: 2, name: '二' }, { r: 3, name: '三' }, { r: 4, name: '四' },
+  { r: 5, name: '五' }, { r: 6, name: '六' }, { r: 7, name: '七' }, { r: 8, name: '八' },
+  { r: 9, name: '九' }, { r: 10, name: '十' },
+  { r: 11, name: '侍从' }, { r: 12, name: '骑士' }, { r: 13, name: '王后' }, { r: 14, name: '国王' }
+];
+const MINOR_MEANINGS = {
+  wands: [
+    '新的行动力与灵感迸发，适合勇敢开始。|动力被卡住，先找回内心的火再出发。',
+    '在多个方向间权衡，先想清楚真正要什么。|顾此失彼，专注当下这一件事。',
+    '迈出第一步后的小成，合作带来进展。|进展受阻，重新对齐目标与伙伴。',
+    '暂歇与稳固，适当停一停为自己充电。|停滞过久，是时候动起来了。',
+    '竞争与摩擦中守住自己的节奏，别被带偏。|冲突缓和，学会适时让步。',
+    '小小的胜利与认可，安心享受它。|胜利来迟，别因此泄气。',
+    '守住成果需要坚持，你比想象中更稳。|有些力不从心，适时借力不丢人。',
+    '速度与多线推进，效率很高但别慌。|计划被打乱，慢下来重新排布。',
+    '接近目标的保护与警惕，别松懈。|过度防备，放轻松些反而更好。',
+    '重担与责任压身，学着分担与托付。|重担将卸，苦尽甘来在即。',
+    '充满好奇的新手能量，去探索与学习。|三分钟热度，踏实一点更能成事。',
+    '带着热情全速前进，行动力满格。|冲动冒进，先踩一脚刹车。',
+    '温暖而有感染力，用热情滋养自己与他人。|精力外耗太多，留一点给自己。',
+    '成熟的主导力，稳稳把事情做成。|控制欲过强，试着放权一些。'
+  ],
+  cups: [
+    '爱与新情感的萌动，敞开心去接。|情感上有些迟疑，允许自己被触动。',
+    '关系的平衡与联结，好好沟通。|关系失衡，说出你真实的感受。',
+    '友谊与欢聚，享受这份温情。|小团体里不太自在，找回舒服的状态。',
+    '对现状的倦怠，别困在“够了”里。|重新生起渴望，打开自己。',
+    '失落与遗憾，允许难过但别沉溺。|走出低落，看见还拥有的。',
+    '温情的回忆与给予，善良会回流。|困在过去，往前看看会更好。',
+    '多样的情感选项，听从内心去选。|选择让人困惑，先静一静。',
+    '情感上的放手与流动，向前走。|还放不下，给自己一点时间。',
+    '情感上的满足与自洽，安心就好。|表面满足内心空，补给自己一点爱。',
+    '情感的圆满与归属感，家与爱都在。|关系有些紧绷，柔化一点。',
+    '温柔敏感的新感受，用心去体会。|有些情绪化，先稳下来。',
+    '浪漫奔涌，跟着心走。|情绪起伏大，别被它牵着跑。',
+    '共情与包容，温柔而有力量。|过度付出，先好好爱自己。',
+    '情感成熟稳重，既能给予也能守护。|压抑情感，允许自己表达。'
+  ],
+  swords: [
+    '清晰的洞见与真相，想明白了。|思路混乱，先把它理清。',
+    '两难与权衡，别逃避做决定。|难以抉择，相信你的直觉。',
+    '心伤与分离，痛会过去。|伤口将愈，试着松手。',
+    '从纷扰中抽离休息，给脑子放个假。|想太多停不下来，强制休息。',
+    '争执与损耗，赢了道理输了关系。|放下输赢，和气更值得。',
+    '过渡与转念，换个角度看问题。|不愿离开旧念头，试着放下。',
+    '看清真相与策略，别自欺。|被蒙蔽了，直面事实。',
+    '困在思绪里自我设限，该松绑了。|看清了束缚，准备挣脱。',
+    '焦虑与夜不能寐，别把念头放大。|焦虑渐退，安顿下来。',
+    '沉重的结局与释然，最难一关已过。|痛苦将尽，天就快亮了。',
+    '求知好问的机灵，多学多问。|信息过载，先筛选一下。',
+    '理性疾驰，想法多行动快。|急躁下判断，慢半拍更稳。',
+    '冷静清醒的洞察，看穿本质。|过于犀利伤了人，柔和些。',
+    '公正而清醒的判断，拿主意很稳。|冷硬讲理不讲情，留点温度。'
+  ],
+  pentacles: [
+    '实在的新机会与资源，落地生根。|机会还没稳，先夯实基础。',
+    '平衡收支与多线，稳稳过日常。|顾此失彼，做点精简。',
+    '扎实的协作与手艺，一起做成事。|配合卡顿，对齐分工。',
+    '守住已有的，但也别抓太紧。|紧抓不放，学着让资源流动。',
+    '匮乏与缺位，难是暂时的。|困境将缓，记得寻求帮助。',
+    '给予与流动，施与受都自在。|失衡的给予，量力而行。',
+    '耕耘后的等待，耐心会有回报。|回报还没显，别着急。',
+    '专注打磨手艺，熟能生巧。|埋头苦干迷失方向，抬头看路。',
+    '丰盛与自足，付出有了果实。|物质有了心却空，补点精神。',
+    '长久的安稳与丰足，根基很稳。|安稳受扰，回到根本。',
+    '踏实学习新技能，从基础打起。|不够踏实，稳住节奏。',
+    '务实推进，把事情办成。|拖延卡住，动起来就好。',
+    '丰盈而从容，享受这份踏实。|过度务实忽略感受，柔软点。',
+    '稳健掌舵，资源与责任都能扛。|固执守成，灵活些更好。'
+  ]
+};
+const TAROT_MINOR = [];
+TAROT_SUITS.forEach(suit => {
+  TAROT_RANKS.forEach(rank => {
+    const parts = MINOR_MEANINGS[suit.key][rank.r - 1].split('|');
+    TAROT_MINOR.push({
+      name: suit.name + rank.name,
+      kind: 'minor', suit: suit.key, suitName: suit.name, glyph: suit.glyph,
+      num: rank.r, roman: ROMAN[rank.r],
+      upright: parts[0], reversed: parts[1]
+    });
+  });
+});
+// 完整牌库 78 张：22 大阿尔卡纳 + 56 小阿尔卡纳
+const TAROT_DECK = TAROT_MAJOR.map(c => ({ ...c, kind: 'major' }))
+  .concat(TAROT_MINOR.map(c => ({ ...c })));
+
+// 塔罗排阵（解读参考「位置」，而非单张孤立解读）
+const TAROT_SPREADS = {
+  time:   { key: 'time',   name: '三张阵',     roles: ['过去', '现在', '未来'], roleHint: ['已经流动的因缘与背景', '此刻最中心的状态', '正在靠近的趋势与方向'] },
+  rel:    { key: 'rel',    name: '关系阵',     roles: ['你', '对方', '关系走向'], roleHint: ['你在这段关系里的状态', '对方或另一方的状态', '这段关系正在去往的方向'] },
+  choice: { key: 'choice', name: '抉择阵',     roles: ['现状', '选项 A', '选项 B'], roleHint: ['你当下的处境与重心', '若走 A 路会浮现的课题', '若走 B 路会浮现的课题'] }
+};
+
+// 日期种子（当天固定）：用于「每日一抽 / 命理小语」稳定。Date 或字符串均可
+function seedFromDate(d) {
+  const s = (d instanceof Date) ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` : String(d);
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+// ===== 八字（四柱）· 趣味参考，纯本地计算，无网络 =====
+// 天干 / 地支 / 五行索引：0木 1火 2土 3金 4水
+const GAN = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+const ZHI = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+const WU = ['木', '火', '土', '金', '水'];
+const GAN_WU = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4];
+const ZHI_WU = [4, 2, 0, 0, 2, 1, 1, 2, 3, 3, 2, 4];
+// 五行分布条配色
+const WU_COLOR = ['#7bbf6a', '#e0736b', '#d9b25a', '#b9bcc4', '#5b8fd0'];
+// 五行日常补益小贴示
+const WU_TIP = {
+  '木': '绿色、植物、向东、清晨散步',
+  '火': '暖光、红色、午时、热闹聚会',
+  '土': '大地色、规律作息、居中、慢食',
+  '金': '白色、精简整理、向西、清爽',
+  '水': '蓝色、水边、向北、独处流动'
+};
+
+// 月支（节气近似边界）：月支索引 0=寅 … 11=丑
+const MONTH_TERMS = [
+  { md: 104, idx: 11 },  // 小寒 1/6  → 丑月
+  { md: 204, idx: 0 },   // 立春 2/4  → 寅月
+  { md: 306, idx: 1 },   // 惊蛰 3/6  → 卯月
+  { md: 405, idx: 2 },   // 清明 4/5  → 辰月
+  { md: 506, idx: 3 },   // 立夏 5/6  → 巳月
+  { md: 606, idx: 4 },   // 芒种 6/6  → 午月
+  { md: 707, idx: 5 },   // 小暑 7/7  → 未月
+  { md: 808, idx: 6 },   // 立秋 8/8  → 申月
+  { md: 908, idx: 7 },   // 白露 9/8  → 酉月
+  { md: 1008, idx: 8 },  // 寒露 10/8 → 戌月
+  { md: 1107, idx: 9 },  // 立冬 11/7 → 亥月
+  { md: 1207, idx: 10 }  // 大雪 12/7 → 子月
+];
+
+function monthBranchIndex(m, d) {
+  const cur = m * 100 + d;
+  let idx = 10; // 默认子月（覆盖 1/1–1/5）
+  for (const t of MONTH_TERMS) {
+    if (cur >= t.md) idx = t.idx; else break;
+  }
+  return idx;
+}
+
+// 时辰 → 时支索引（与 ZHI 索引一致：0子 … 11亥）
+function hourBranchIndex(h) {
+  if (h === 23 || h === 0) return 0;
+  if (h === 1 || h === 2) return 1;
+  if (h === 3 || h === 4) return 2;
+  if (h === 5 || h === 6) return 3;
+  if (h === 7 || h === 8) return 4;
+  if (h === 9 || h === 10) return 5;
+  if (h === 11 || h === 12) return 6;
+  if (h === 13 || h === 14) return 7;
+  if (h === 15 || h === 16) return 8;
+  if (h === 17 || h === 18) return 9;
+  if (h === 19 || h === 20) return 10;
+  return 11;
+}
+
+// 公历 → 儒略日（正午，整数）；Fliegel–Van Flandern 算法
+function gregorianToJDN(year, month, day) {
+  const a = (14 - month) / 12 | 0;
+  const y = year + 4800 - a;
+  const m = month + 12 * a - 3;
+  return day + ((153 * m + 2) / 5 | 0) + 365 * y + (y / 4 | 0) - (y / 100 | 0) + (y / 400 | 0) - 32045;
+}
+
+// 排四柱 + 五行分布 + 日主强弱（趣味近似）
+function computeBaZi(year, month, day, hour, gender) {
+  // 年柱：以立春≈2/4 为界，之前出生用上一年
+  let yForPillar = year;
+  if (month < 2 || (month === 2 && day < 4)) yForPillar = year - 1;
+  const yearGZ = ((yForPillar - 4) % 60 + 60) % 60;
+  const yGan = yearGZ % 10;
+  const yZhi = yearGZ % 12;
+
+  // 月柱：五虎遁
+  const mbIdx = monthBranchIndex(month, day);
+  const mGan = ((yGan % 5) * 2 + 2 + mbIdx) % 10;
+  const mZhi = (mbIdx + 2) % 12;
+
+  // 日柱：儒略日法
+  const jdn = gregorianToJDN(year, month, day);
+  const dayGZ = ((jdn + 49) % 60 + 60) % 60;
+  const dGan = dayGZ % 10;
+  const dZhi = dayGZ % 12;
+
+  // 时柱：五鼠遁（hour 为 null 表示时辰未知；晚子时取次日日干）
+  let hGan = null, hZhi = null;
+  if (hour != null && !isNaN(hour)) {
+    const hbIdx = hourBranchIndex(hour);
+    let dayGanForHour = dGan;
+    if (hour === 23) {
+      const jdn2 = jdn + 1;
+      dayGanForHour = (((jdn2 + 49) % 60 + 60) % 60) % 10;
+    }
+    hGan = ((dayGanForHour % 5) * 2 + hbIdx) % 10;
+    hZhi = hbIdx;
+  }
+
+  // 五行分布（4 干 + 4 支；时辰未知则少 2 字）
+  const elements = [0, 0, 0, 0, 0];
+  const push = (g, z) => { if (g != null) elements[GAN_WU[g]]++; if (z != null) elements[ZHI_WU[z]]++; };
+  push(yGan, yZhi); push(mGan, mZhi); push(dGan, dZhi);
+  if (hGan != null) push(hGan, hZhi);
+
+  // 日主（出生日的天干）
+  const dm = dGan;
+  const dmElement = GAN_WU[dm];
+
+  // 身强身弱（趣味近似：同党 vs 异党）
+  const supportE = (dmElement + 4) % 5; // 生我者（印）
+  const produceE = (dmElement + 1) % 5; // 我生者（食伤）
+  const controlE = (dmElement + 2) % 5; // 我克者（财）
+  const restrictE = (dmElement + 3) % 5; // 克我者（官杀）
+  const support = elements[dmElement] + elements[supportE];
+  const drain = elements[produceE] + elements[controlE] + elements[restrictE];
+  let strength = '中和';
+  if (support > drain) strength = '偏强';
+  else if (support < drain) strength = '偏弱';
+
+  // 喜用（日常补益建议）：取最弱五行
+  let yong = 0, min = elements[0];
+  for (let i = 1; i < 5; i++) if (elements[i] < min) { min = elements[i]; yong = i; }
+
+  return {
+    year: { gan: yGan, zhi: yZhi },
+    month: { gan: mGan, zhi: mZhi },
+    day: { gan: dGan, zhi: dZhi },
+    hour: hGan != null ? { gan: hGan, zhi: hZhi } : null,
+    dayMaster: dm,
+    dayMasterElement: dmElement,
+    elements: elements,
+    strength: strength,
+    yong: yong
+  };
+}
+
+function gzLabel(p) {
+  return GAN[p.gan] + ZHI[p.zhi];
+}
+
+// 日主疗愈小语（温柔、非宿命；按元素 + 当日种子选句）
+const FATE_NOTES = {
+  0: ['你像一棵安静生长的树，今天适合多接触绿意与自然，给心松松土。', '木主仁，今天对他人温柔一点，也是在悄悄滋养自己。'],
+  1: ['火主礼，今天适合把热情用在真正喜欢的事上，别让它散光。', '你自带暖意，今天记得先照亮自己，再谈照亮别人。'],
+  2: ['土主信，今天适合把飘着的念头落地，一件件踏实做完。', '你像大地一样稳，今天允许自己慢一点，扎根比赶路重要。'],
+  3: ['金主义，今天适合做个清爽的减法，舍去不再需要的东西。', '你心里有把尺，今天相信自己的判断，不必将就。'],
+  4: ['水主智，今天适合顺流而行，遇到卡顿就绕一绕。', '你本就柔软有力量，今天多给自己一点独处与流动的时间。']
+};
+
+function getFateNote(result, today) {
+  const seed = seedFromDate(today || new Date());
+  const list = FATE_NOTES[result.dayMasterElement] || FATE_NOTES[0];
+  const line = list[seed % list.length];
+  const yongName = WU[result.yong];
+  const strengthText = result.strength === '偏强'
+    ? '今天你的能量偏饱满，适合把想法落地、向外行动'
+    : result.strength === '偏弱'
+      ? '今天你的能量偏内收，适合休养、沉淀，别硬撑'
+      : '今天能量相对平衡，跟着感觉走就好';
+  const yongText = `日常可多亲近「${yongName}」相关的事物（${WU_TIP[yongName] || ''}），为身心补一点气。`;
+  return { line, strengthText, yongText, yongName };
+}

@@ -23,11 +23,6 @@
     const day = String(d.getDate()).padStart(2, '0');
     return `${d.getFullYear()}-${m}-${day}`;
   }
-  function seedFromDate(str) {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) { h = (h * 31 + str.charCodeAt(i)) >>> 0; }
-    return h;
-  }
   function toast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -90,13 +85,21 @@
   }
 
   // ===== 页面导航 =====
-  const pages = { home: 'page-home', wish: 'page-wish', music: 'page-music' };
+  const pages = { home: 'page-home', wish: 'page-wish', music: 'page-music', tarot: 'page-tarot', fate: 'page-fate' };
   function navigate(pageId) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(pages[pageId]).classList.add('active');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.nav === pageId));
     if (pageId === 'home') { computeAffirmation(); renderAffirmation(); }
     if (pageId === 'wish') { renderWishes(); }
+    if (pageId === 'tarot') { resetTarot(); }
+    if (pageId === 'fate') {
+      const fd = document.getElementById('fateDate');
+      if (fd && !fd.value) {
+        const t = new Date();
+        fd.value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+      }
+    }
     window.scrollTo(0, 0);
   }
   document.querySelectorAll('[data-nav]').forEach(el => {
@@ -268,49 +271,132 @@
   const MusicStore = (() => {
     const DB_NAME = 'guangyu_music';
     const STORE = 'tracks';
+    const VERSION = 2;
     let db = null;
+    let useMem = false;          // IndexedDB 不可用 / 不回调时降级为内存 Map
+    let mem = null;
     function open() {
-      return new Promise((resolve, reject) => {
-        if (db) return resolve(db);
-        if (!window.indexedDB) { reject(new Error('no-idb')); return; }
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = () => {
-          const d = req.result;
-          if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' });
+      return new Promise((resolve) => {
+        if (useMem) { resolve(null); return; }
+        if (db) { resolve(db); return; }
+        if (!window.indexedDB) { useMem = true; mem = new Map(); resolve(null); return; }
+        let settled = false;
+        const to = setTimeout(() => {            // 兜底：4s 内无回调则降级内存，避免白屏
+          if (settled) return; settled = true; useMem = true;
+          if (!mem) mem = new Map(); resolve(null);
+        }, 4000);
+        let req;
+        try { req = indexedDB.open(DB_NAME, VERSION); }
+        catch (e) { settled = true; clearTimeout(to); useMem = true; mem = new Map(); resolve(null); return; }
+        req.onupgradeneeded = (e) => {
+          const d = e.target.result;
+          // 老库（v1）已存在 store 时不再重建，仅安全补加索引
+          let os = d.objectStoreNames.contains(STORE)
+            ? e.target.transaction.objectStore(STORE)
+            : d.createObjectStore(STORE, { keyPath: 'id' });
+          if (!os.indexNames.contains('goal')) os.createIndex('goal', 'goal', { unique: false });
+          if (!os.indexNames.contains('isPreset')) os.createIndex('isPreset', 'isPreset', { unique: false });
+          if (!os.indexNames.contains('style')) os.createIndex('style', 'style', { unique: false });
         };
-        req.onsuccess = () => { db = req.result; resolve(db); };
-        req.onerror = () => reject(req.error);
+        req.onsuccess = () => { if (settled) return; settled = true; clearTimeout(to); db = req.result; resolve(db); };
+        req.onerror = () => { if (settled) return; settled = true; clearTimeout(to); useMem = true; if (!mem) mem = new Map(); resolve(null); };
       });
     }
     async function put(track) {
+      if (useMem) { mem.set(track.id, track); return; }
       const d = await open();
-      return new Promise((resolve, reject) => {
+      if (useMem) { mem.set(track.id, track); return; }
+      return new Promise((resolve) => {
         const tx = d.transaction(STORE, 'readwrite');
         tx.objectStore(STORE).put(track);
         tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        tx.onerror = () => { useMem = true; mem.set(track.id, track); resolve(); };
       });
     }
     async function getAll() {
+      if (useMem) return Array.from(mem.values());
       const d = await open();
-      return new Promise((resolve, reject) => {
+      if (useMem) return Array.from(mem.values());
+      return new Promise((resolve) => {
         const tx = d.transaction(STORE, 'readonly');
         const req = tx.objectStore(STORE).getAll();
         req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
+        req.onerror = () => { useMem = true; resolve(Array.from(mem.values())); };
       });
     }
     async function remove(id) {
+      if (useMem) { mem.delete(id); return; }
       const d = await open();
-      return new Promise((resolve, reject) => {
+      if (useMem) { mem.delete(id); return; }
+      return new Promise((resolve) => {
         const tx = d.transaction(STORE, 'readwrite');
         tx.objectStore(STORE).delete(id);
         tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        tx.onerror = () => { useMem = true; mem.delete(id); resolve(); };
       });
     }
-    return { put, getAll, remove };
+    async function getById(id) {
+      if (useMem) return mem.get(id) || null;
+      const d = await open();
+      if (useMem) return mem.get(id) || null;
+      return new Promise((resolve) => {
+        const tx = d.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => { useMem = true; resolve(mem.get(id) || null); };
+      });
+    }
+    async function incPlay(id) {
+      try {
+        const t = await getById(id);
+        if (!t) return;
+        t.playCount = (t.playCount || 0) + 1;
+        await put(t);
+      } catch (e) {}
+    }
+    return { put, getAll, getById, remove, incPlay };
   })();
+
+  // ===== 预置伴奏曲库（用合成引擎一次性生成固定作品，入库标记 isPreset）=====
+  // 每首 = 固定 params（目标 + 风格 + 频率 + 特效），播放时实时合成、下载时离线渲染，零存储占用
+  const PRESET_LIBRARY = [
+    { id:'p_love_1',   name:'心动信号',   goal:'爱情',     style:'浪漫流行', freq:432, fx:['chime'],          tags:['爱情','浪漫','甜'] },
+    { id:'p_love_2',   name:'两心相悦',   goal:'爱情',     style:'钢琴叙事', freq:528, fx:[],                tags:['爱情','治愈','安静'] },
+    { id:'p_wealth_1', name:'金光流动',   goal:'财富',     style:'轻快民谣', freq:432, fx:['coins','chime'],  tags:['财富','丰盛','金钱'] },
+    { id:'p_wealth_2', name:'好事发生',   goal:'财富',     style:'清新流行', freq:639, fx:['coins'],          tags:['财富','好运','顺利'] },
+    { id:'p_health_1', name:'森林氧吧',   goal:'健康',     style:'温暖治愈', freq:528, fx:['birds'],          tags:['健康','自然','放松'] },
+    { id:'p_health_2', name:'晨光唤醒',   goal:'健康',     style:'空灵氛围', freq:432, fx:[],                tags:['健康','能量','清新'] },
+    { id:'p_calm_1',   name:'静心细雨',   goal:'内在平静', style:'空灵氛围', freq:432, fx:['rain'],           tags:['平静','放松','睡眠'] },
+    { id:'p_calm_2',   name:'归零',       goal:'内在平静', style:'钢琴叙事', freq:528, fx:[],                tags:['平静','冥想','沉静'] },
+    { id:'p_career_1', name:'步步高升',   goal:'事业',     style:'清新流行', freq:432, fx:['birds'],         tags:['事业','职场','专注'] },
+    { id:'p_career_2', name:'破局',       goal:'事业',     style:'轻快民谣', freq:639, fx:[],                tags:['事业','突破','自信'] }
+  ];
+  const FX_ZH = { rain:'细雨', waves:'海浪', stream:'溪流', fire:'篝火', birds:'鸟鸣', chime:'风铃', coins:'金币' };
+
+  // 首次进入时把预置曲库写入 IndexedDB（只写缺失的，已存在则跳过，可热更新）
+  async function ensurePresets() {
+    let existing = [];
+    try { existing = await MusicStore.getAll(); } catch (e) { return; }
+    const have = new Set(existing.map(t => t.id));
+    for (const p of PRESET_LIBRARY) {
+      if (have.has(p.id)) continue;
+      try {
+        const beat = BEAT_BY_GOAL[p.goal] || 8;
+        const params = SynthEngine.makeParams(p.goal, p.freq, beat, { styleName: p.style, fx: p.fx });
+        await MusicStore.put({
+          id: p.id, name: p.name, goal: p.goal, style: p.style, freq: p.freq,
+          tags: p.tags || [], fx: p.fx, params, isPreset: true,
+          note: `合成疗愈曲 · ${p.style} · ${p.freq}Hz`,
+          addedAt: Date.now(), playCount: 0
+        });
+      } catch (e) {}
+    }
+  }
+
+  // 伴奏库搜索 / 筛选状态
+  let libQuery = '';
+  let libFilter = 'all';
+  let libRenderToken = 0;   // 防止连续触发 renderLibrary 时并发双写导致的重复渲染
 
   let importGoal = '爱情';
   let importAudio = null;      // 全局 <audio>，播放导入伴奏
@@ -1254,11 +1340,40 @@
     if (c) c.classList.add('hide');
   }
 
+  // 沉浸模式经文：进入时渲染当前曲目经文，逐行呼吸式高亮（独立于播放器面板的朗读高亮）
+  let ssScriptureTimer = null;
+  function renderSsScripture() {
+    const box = document.getElementById('ssScripture');
+    if (!box) return;
+    if (!currentTrack || !currentTrack.scripture || !currentTrack.scripture.length) {
+      box.style.display = 'none'; box.innerHTML = ''; return;
+    }
+    box.innerHTML = currentTrack.scripture.map(l => '<div class="sr-line">' + escapeHtml(l) + '</div>').join('');
+    box.style.display = 'flex';
+  }
+  function startSsScriptureLoop() {
+    const box = document.getElementById('ssScripture');
+    if (!box || box.style.display === 'none') return;
+    const lines = Array.from(box.querySelectorAll('.sr-line'));
+    if (!lines.length) return;
+    let i = 0;
+    const hl = () => lines.forEach((el, idx) => el.classList.toggle('sr-active', idx === i));
+    hl(0);
+    ssScriptureTimer = setInterval(() => { i = (i + 1) % lines.length; hl(i); }, 3600);
+  }
+  function stopSsScriptureLoop() {
+    if (ssScriptureTimer) { clearInterval(ssScriptureTimer); ssScriptureTimer = null; }
+    const box = document.getElementById('ssScripture');
+    if (box) box.querySelectorAll('.sr-line').forEach(el => el.classList.remove('sr-active'));
+  }
+
   function openScreensaver() {
     if (!currentTrack) { toast('先点「生成」或选一首伴奏哦'); return; }
     const ss = document.getElementById('screensaver');
     updateSsPlayButton();
     ss.style.display = 'flex';
+    renderSsScripture();
+    startSsScriptureLoop();
     requestAnimationFrame(() => requestAnimationFrame(() => {
       ss.classList.add('show');
       showSsControls();
@@ -1268,6 +1383,7 @@
   function closeScreensaver() {
     const ss = document.getElementById('screensaver');
     hideSsControlsNow();
+    stopSsScriptureLoop();
     ss.classList.remove('show');
     setTimeout(() => { ss.style.display = 'none'; }, 450);
   }
@@ -1346,32 +1462,151 @@
     document.querySelectorAll('#fxChips .chip').forEach(c => c.classList.toggle('active', musicFx.has(c.dataset.fx)));
   }
 
-  function renderMusicList() {
-    const list = document.getElementById('musicList');
-    list.innerHTML = '';
-    PRESET_MUSIC.forEach(m => {
-      const div = document.createElement('div');
-      div.className = 'music-item';
-      div.dataset.id = m.id;
-      div.innerHTML = `
-        <div class="music-item-icon">${m.icon}</div>
-        <div class="music-item-info">
-          <div class="music-item-title">${m.title}</div>
-          <div class="music-item-sub">${m.goal} · ${m.freq}Hz</div>
-        </div>`;
-      div.addEventListener('click', () => playPreset(m));
-      list.appendChild(div);
-    });
+  async function renderLibrary() {
+    const myToken = ++libRenderToken;   // 仅最新一次渲染会真正落盘，旧并发渲染直接放弃
+    const presetEl = document.getElementById('presetList');
+    const importEl = document.getElementById('importList');
+    if (presetEl) presetEl.innerHTML = '';
+    if (importEl) importEl.innerHTML = '';
+    let tracks = [];
+    try { tracks = await MusicStore.getAll(); } catch (e) { tracks = []; }
+    if (myToken !== libRenderToken) return;   // 期间已有更新的渲染发起，放弃本次，避免重复追加
+    const q = (libQuery || '').trim().toLowerCase();
+    const match = (t) => {
+      if (libFilter !== 'all' && t.goal !== libFilter) return false;
+      if (!q) return true;
+      const hay = [t.name, t.goal, t.style, (t.tags || []).join(' '), (t.fx || []).map(f => FX_ZH[f]).join(' ')].join(' ').toLowerCase();
+      return hay.includes(q);
+    };
+    const presets = tracks.filter(t => t.isPreset && match(t));
+    const imports = tracks.filter(t => !t.isPreset && match(t));
+    if (presetEl) {
+      if (!presets.length) presetEl.innerHTML = '<div class="lib-empty">没有匹配的预置曲，换个关键词试试</div>';
+      presets.forEach(t => presetEl.appendChild(buildTrackItem(t, true)));
+    }
+    if (importEl) {
+      if (!imports.length) importEl.innerHTML = '<div class="lib-empty">还没有上传的伴奏，点上方「上传音乐文件」导入 mp3</div>';
+      imports.forEach(t => importEl.appendChild(buildTrackItem(t, false)));
+    }
   }
 
-  function playPreset(m) {
-    const beat = BEAT_BY_GOAL[m.goal] || 8;
-    const params = SynthEngine.makeParams(m.goal, +m.freq, beat);
-    showPlayer(m.icon, m.title, `${m.goal} · ${m.freq}Hz · ${params.styleName} · ${params.melody.label}`, 'synth', { params });
-    if (SynthEngine.start(params)) setPlayButton(true);
+  function buildTrackItem(t, isPreset) {
+    const div = document.createElement('div');
+    div.className = 'music-item';
+    const fxTxt = (t.fx && t.fx.length) ? ' · ' + t.fx.map(f => FX_ZH[f]).join('+') : '';
+    const freqTxt = t.freq ? t.freq + 'Hz' : '';
+    const sub = isPreset ? `${t.goal} · ${t.style} · ${freqTxt}${fxTxt}` : `${t.goal} · 我的伴奏`;
+    div.innerHTML = `
+      <div class="music-item-icon">${isPreset ? '✨' : '🎵'}</div>
+      <div class="music-item-info">
+        <div class="music-item-title">${escapeHtml(t.name)}</div>
+        <div class="music-item-sub">${escapeHtml(sub)}</div>
+      </div>
+      ${isPreset ? '' : '<button class="btn btn-ghost btn-sm del-import" data-id="' + t.id + '">删除</button>'}`;
+    div.addEventListener('click', (e) => {
+      if (e.target.closest('.del-import')) return;
+      playTrack(t);
+    });
+    if (!isPreset) {
+      div.querySelector('.del-import').addEventListener('click', async () => {
+        await MusicStore.remove(t.id);
+        renderLibrary();
+        toast('已删除');
+      });
+    }
+    return div;
   }
+
+  function playTrack(t) {
+    if (t.params) {
+      // 预置曲：合成引擎实时播放（含主题背景切换）
+      SynthEngine.stop();
+      ScriptureReader.stop();
+      const fxTxt = (t.fx && t.fx.length) ? ' · ' + t.fx.map(f => FX_ZH[f]).join(' + ') : '';
+      const sub = `${t.goal} · ${t.style} · ${t.freq}Hz${fxTxt}`;
+      // 预置曲附带该目标的一段经文（按 id 选段，稳定可复现）
+      const seed = (t.id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+      const scripture = pickScripture(t.goal, seed);
+      showPlayer('✨', t.name, sub + ' · 可播放或下载', 'synth', { params: t.params, scripture, scriptureAuto: false });
+      if (SynthEngine.start(t.params)) setPlayButton(true);
+      MusicStore.incPlay(t.id);
+      toast('正在播放 ✨');
+    } else if (t.blob) {
+      playImported(t);
+    }
+  }
+
+  // ===== 经文伴读（TTS 朗读 + 逐行高亮，无中文嗓音时退化为定时器高亮）=====
+  const ScriptureReader = (() => {
+    let reading = false;
+    let lineEls = [];
+    let timer = null;
+    function voice() {
+      if (!('speechSynthesis' in window)) return null;
+      const vs = window.speechSynthesis.getVoices() || [];
+      return vs.find(v => /zh|cmn|Chinese/i.test((v.lang || '') + (v.name || ''))) || null;
+    }
+    function highlight(i) { lineEls.forEach((el, idx) => el.classList.toggle('sr-active', idx === i)); }
+    function setBtn(txt) { const b = document.getElementById('btnScripture'); if (b) b.textContent = txt; }
+    function stop() {
+      reading = false;
+      if (timer) { clearTimeout(timer); timer = null; }
+      if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+      lineEls.forEach(el => el.classList.remove('sr-active'));
+      setBtn('🔊 朗读');
+    }
+    function read(lines) {
+      stop();
+      lineEls = Array.from(document.querySelectorAll('#scriptureText .sr-line'));
+      if (!lines || !lines.length) return false;
+      reading = true; setBtn('⏸ 停止');
+      const synth = window.speechSynthesis;
+      if (synth && voice()) {
+        let i = 0;
+        const next = () => {
+          if (!reading) return;
+          if (i >= lines.length) { stop(); return; }
+          highlight(i);
+          const u = new SpeechSynthesisUtterance(lines[i]);
+          u.lang = 'zh-CN'; const v = voice(); if (v) u.voice = v;
+          u.rate = 0.9; u.pitch = 1.0;
+          u.onend = () => { if (!reading) return; i++; next(); };
+          u.onerror = () => { if (!reading) return; i++; next(); };
+          try { synth.speak(u); } catch (e) { if (!reading) return; i++; next(); }
+        };
+        next();
+        return true;
+      }
+      // 退化：无中文嗓音时按行定时高亮（无声但可见）
+      let i = 0;
+      const step = () => {
+        if (!reading) return;
+        highlight(i);
+        if (++i >= lines.length) { stop(); return; }
+        timer = setTimeout(step, 3200);
+      };
+      step();
+      return true;
+    }
+    return {
+      render(lines) {
+        const box = document.getElementById('scriptureBox');
+        const txt = document.getElementById('scriptureText');
+        if (!box || !txt) return;
+        if (!lines || !lines.length) { box.style.display = 'none'; txt.innerHTML = ''; return; }
+        txt.innerHTML = lines.map(l => '<div class="sr-line">' + escapeHtml(l) + '</div>').join('');
+        box.style.display = 'block';
+        setBtn('🔊 朗读');
+      },
+      start(lines) { return read(lines); },
+      toggle(lines) { if (reading) { stop(); return false; } return read(lines); },
+      stop,
+      isReading() { return reading; }
+    };
+  })();
 
   function showPlayer(icon, title, sub, type, extra) {
+    ScriptureReader.stop();   // 切歌先停掉上一段经文朗读
     const card = document.getElementById('playerCard');
     card.style.display = 'block';
     document.getElementById('playerVisual').textContent = icon;
@@ -1383,11 +1618,15 @@
       : (extra && extra.params && extra.params.goal);
     applyTheme(goal);
     if (type === 'import') {
-      currentTrack = { type: 'import', icon, title, sub, file: extra.file };
+      currentTrack = { type: 'import', icon, title, sub, file: extra.file, scripture: extra.scripture || [], scriptureAuto: false };
       document.getElementById('playerNote').textContent = '正在播放你导入的伴奏（循环播放）· 可下载原文件';
     } else {
-      currentTrack = { type: 'synth', icon, title, sub, params: extra.params };
+      currentTrack = { type: 'synth', icon, title, sub, params: extra.params, scripture: extra.scripture || [], scriptureAuto: !!extra.scriptureAuto };
       document.getElementById('playerNote').textContent = '已合成疗愈音乐：改编名曲/原创旋律 + 和弦伴奏 + 极轻治愈频率打底，可播放或下载 30 秒试听片段';
+    }
+    ScriptureReader.render(currentTrack.scripture);
+    if (currentTrack.scriptureAuto && currentTrack.scripture.length) {
+      setTimeout(() => { if (currentTrack && currentTrack.scriptureAuto) ScriptureReader.start(currentTrack.scripture); }, 120);
     }
     setPlayButton(false);
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1400,8 +1639,6 @@
     const wishText = document.getElementById('wishPrompt').value.trim();
     const btn = document.getElementById('btnGenerate');
     btn.disabled = true;
-
-    const FX_ZH = { rain: '细雨', waves: '海浪', stream: '溪流', fire: '篝火', birds: '鸟鸣', chime: '风铃', coins: '金币' };
 
     function finalize(aiHit) {
       btn.disabled = false;
@@ -1427,7 +1664,10 @@
       const params = SynthEngine.makeParams(musicGoal, freq, beat, { styleName, fx: fxList, wish: wishText });
       const fxTag = params.fxLabels.length ? ' · ' + params.fxLabels.join(' + ') : '';
       const sub = `${musicFreq}Hz · ${params.styleName} · ${params.melody.label}${fxTag} · ${musicDur} 分钟 · ${aiNote ? 'AI 已理解你的愿望' : meta.tip}`;
-      showPlayer(meta.icon, customName || `定制 Sub · ${musicGoal}`, sub, 'synth', { params });
+      // 经文伴读：勾选时按目标取一段经文，并随播放自动诵读
+      const withScr = document.getElementById('withScripture') && document.getElementById('withScripture').checked;
+      const scripture = withScr ? pickScripture(musicGoal, (freq * 7 + beat * 13 + (wishText ? wishText.length : 0))) : [];
+      showPlayer(meta.icon, customName || `定制 Sub · ${musicGoal}`, sub, 'synth', { params, scripture, scriptureAuto: withScr });
       if (aiNote) document.getElementById('playerNote').textContent = '🪄 ' + aiNote;
       toast(aiNote ? 'AI 定制完成 ✨' : '定制音乐已生成 ✨');
     }
@@ -1457,6 +1697,7 @@
       if (!a.paused) {
         a.pause();
         setPlayButton(false);
+        ScriptureReader.stop();
       } else {
         a.play().then(() => setPlayButton(true)).catch(() => toast('播放失败，请重试'));
       }
@@ -1465,15 +1706,299 @@
     if (SynthEngine.isPlaying()) {
       SynthEngine.stop();
       setPlayButton(false);
+      ScriptureReader.stop();
     } else {
       if (SynthEngine.start(currentTrack.params)) {
         setPlayButton(true);
         toast('正在播放 ✨');
+        if (currentTrack.scriptureAuto && currentTrack.scripture && currentTrack.scripture.length) ScriptureReader.start(currentTrack.scripture);
       } else {
         toast('当前浏览器不支持音频合成');
       }
     }
   });
+
+  // 经文伴读：手动朗读 / 停止（独立于音乐，可单独诵读）
+  document.getElementById('btnScripture').addEventListener('click', () => {
+    if (!currentTrack || !currentTrack.scripture || !currentTrack.scripture.length) { toast('这首没有附带经文哦'); return; }
+    ScriptureReader.toggle(currentTrack.scripture);
+  });
+
+  // ===== 塔罗 · 牌阵解读（选排阵 → 去洗牌 → 78 张亲手抽牌 → 排阵解读；牌面 SVG 参考韦特塔罗）=====
+  let tarotSpreadKey = 'time';
+  let tarotState = null;   // { spread, positions:[{card,reversed,revealed}] }
+  let tarotQuestion = '';
+  let tarotPhase = 'setup';   // setup | draw | result
+  let tarotDraw = null;       // { order:[idx...], drawn:[bool×78], picks:{}, n, count }
+  const tarotQEl = document.getElementById('tarotQuestion');
+  if (tarotQEl) tarotQEl.addEventListener('input', () => { tarotQuestion = tarotQEl.value.trim(); });
+
+  const SUIT_COLOR = { wands: '#c1773a', cups: '#3f86b8', swords: '#7d8590', pentacles: '#b8893b' };
+
+  // 五角星路径点（星币用）
+  function starPoints(cx, cy, outer, inner, n) {
+    const p = [];
+    for (let i = 0; i < n * 2; i++) {
+      const r = (i % 2 === 0) ? outer : inner;
+      const a = -Math.PI / 2 + i * Math.PI / n;
+      p.push((cx + r * Math.cos(a)).toFixed(1) + ',' + (cy + r * Math.sin(a)).toFixed(1));
+    }
+    return p.join(' ');
+  }
+  // 花色矢量符号（权杖/圣杯/宝剑/星币）
+  function tarotSuitSVG(suit, cx, cy, s, color) {
+    const k = s / 40; const col = color || '#b8893b';
+    if (suit === 'wands') {
+      return `<g stroke="${col}" stroke-width="${2.4 * k}" fill="none" stroke-linecap="round">
+        <line x1="${cx}" y1="${cy + 34 * k}" x2="${cx}" y2="${cy - 30 * k}"/>
+        <path d="M${cx - 14 * k} ${cy - 4 * k} L${cx} ${cy - 22 * k} L${cx + 14 * k} ${cy - 4 * k}"/>
+        <circle cx="${cx}" cy="${cy - 34 * k}" r="${3.4 * k}" fill="${col}"/>
+      </g>`;
+    }
+    if (suit === 'cups') {
+      return `<g fill="none" stroke="${col}" stroke-width="${2.4 * k}" stroke-linejoin="round">
+        <path d="M${cx - 20 * k} ${cy - 18 * k} Q ${cx} ${cy + 8 * k} ${cx + 20 * k} ${cy - 18 * k} Z" fill="${col}" fill-opacity="0.12"/>
+        <line x1="${cx}" y1="${cy + 2 * k}" x2="${cx}" y2="${cy + 22 * k}"/>
+        <line x1="${cx - 12 * k}" y1="${cy + 24 * k}" x2="${cx + 12 * k}" y2="${cy + 24 * k}"/>
+      </g>`;
+    }
+    if (suit === 'swords') {
+      return `<g stroke="${col}" stroke-width="${2.4 * k}" fill="none" stroke-linecap="round">
+        <line x1="${cx}" y1="${cy + 34 * k}" x2="${cx}" y2="${cy - 34 * k}"/>
+        <line x1="${cx - 16 * k}" y1="${cy - 14 * k}" x2="${cx + 16 * k}" y2="${cy - 14 * k}"/>
+        <circle cx="${cx}" cy="${cy - 40 * k}" r="${3 * k}" fill="${col}"/>
+      </g>`;
+    }
+    const pts = starPoints(cx, cy, 22 * k, 9 * k, 5);
+    return `<g>
+      <circle cx="${cx}" cy="${cy}" r="${26 * k}" fill="${col}" fill-opacity="0.12" stroke="${col}" stroke-width="${2.2 * k}"/>
+      <polygon points="${pts}" fill="${col}" fill-opacity="0.85"/>
+    </g>`;
+  }
+  // 大阿尔卡纳牌面场景（参考韦特塔罗意象，简化绘制）
+  function majorScene(idx) {
+    const S = '#e9c39a', PUR = '#8a6fb0', G = '#b8893b';
+    const sun = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#f3c14b"/>` + [...Array(8)].map((_, k) => { const a = k * Math.PI / 4; return `<line x1="${(x + Math.cos(a) * (r + 3)).toFixed(1)}" y1="${(y + Math.sin(a) * (r + 3)).toFixed(1)}" x2="${(x + Math.cos(a) * (r + 12)).toFixed(1)}" y2="${(y + Math.sin(a) * (r + 12)).toFixed(1)}" stroke="#e09b2e" stroke-width="2"/>`; }).join('');
+    const fig = (x, y, robe) => `<circle cx="${x}" cy="${y}" r="12" fill="${S}"/><path d="M${x - 15} ${y + 42} Q ${x} ${y + 6} ${x + 15} ${y + 42} Z" fill="${robe}"/>`;
+    const moon = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#e9eef5"/><path d="M${x + 4} ${y - r} A ${r} ${r} 0 1 0 ${x + 4} ${y + r} A ${r - 5} ${r - 5} 0 1 1 ${x + 4} ${y - r} Z" fill="#cdd6e2"/>`;
+    const star8 = (x, y, r) => { let p = ''; for (let k = 0; k < 16; k++) { const rr = k % 2 ? r * 0.45 : r; const a = -Math.PI / 2 + k * Math.PI / 8; p += `${(x + rr * Math.cos(a)).toFixed(1)},${(y + rr * Math.sin(a)).toFixed(1)} `; } return `<polygon points="${p}" fill="#f3c14b"/>`; };
+    switch (idx) {
+      case 0: return `${sun(40, 78, 14)}<path d="M118 248 L158 248 L158 200 Z" fill="#c9a36b"/><circle cx="78" cy="150" r="12" fill="${S}"/><path d="M64 192 Q78 166 92 192 Z" fill="${PUR}"/><circle cx="102" cy="202" r="5" fill="#9b7bbf"/>`;
+      case 1: return `<path d="M68 68 q22 -14 44 0" stroke="${G}" stroke-width="3" fill="none"/><line x1="90" y1="58" x2="90" y2="120" stroke="${G}" stroke-width="3"/><circle cx="90" cy="138" r="12" fill="${S}"/><path d="M76 180 Q90 156 104 180 Z" fill="${PUR}"/><rect x="62" y="198" width="56" height="14" rx="3" fill="#cbb08a"/>`;
+      case 2: return `<rect x="40" y="70" width="14" height="160" rx="4" fill="#cdbfa6"/><rect x="126" y="70" width="14" height="160" rx="4" fill="#cdbfa6"/><rect x="34" y="64" width="26" height="12" rx="3" fill="${G}"/><rect x="120" y="64" width="26" height="12" rx="3" fill="${G}"/><circle cx="90" cy="150" r="13" fill="${S}"/><path d="M74 196 Q90 168 106 196 Z" fill="#9b7bbf"/><path d="M82 234 a8 8 0 1 0 16 0" fill="none" stroke="#b9bcc4" stroke-width="2"/>`;
+      case 3: { const stars = [...Array(11)].map((_, k) => { const a = Math.PI * (0.12 + 0.76 * k / 10); const x = 90 + Math.sin(a) * 44; const y = 80 - Math.cos(a) * 30; return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#f3c14b"/>`; }).join(''); return `${stars}<circle cx="90" cy="132" r="13" fill="${S}"/><path d="M74 180 Q90 152 106 180 Z" fill="#c98bb0"/><path d="M70 176 q20 12 40 0" stroke="#7bbf6a" stroke-width="3" fill="none"/>`; }
+      case 4: return `<rect x="58" y="122" width="64" height="108" rx="6" fill="#9a7b5a"/><rect x="52" y="114" width="76" height="14" rx="4" fill="#7a5b3a"/><circle cx="90" cy="150" r="13" fill="${S}"/><path d="M74 196 Q90 168 106 196 Z" fill="#7a5b3a"/><circle cx="60" cy="150" r="4" fill="#6b4f33"/><circle cx="120" cy="150" r="4" fill="#6b4f33"/>`;
+      case 5: return `<line x1="120" y1="70" x2="120" y2="210" stroke="${G}" stroke-width="3"/><line x1="112" y1="86" x2="128" y2="86" stroke="${G}" stroke-width="3"/><line x1="112" y1="100" x2="128" y2="100" stroke="${G}" stroke-width="3"/><circle cx="90" cy="132" r="13" fill="${S}"/><path d="M74 180 Q90 152 106 180 Z" fill="#cbb08a"/><path d="M66 206 l0 -16 M60 198 l12 0" stroke="${G}" stroke-width="2"/><path d="M114 206 l0 -16 M108 198 l12 0" stroke="${G}" stroke-width="2"/><circle cx="64" cy="180" r="6" fill="${S}"/><circle cx="116" cy="180" r="6" fill="${S}"/>`;
+      case 6: return `${sun(90, 72, 15)}<circle cx="70" cy="162" r="11" fill="${S}"/><path d="M58 202 Q70 178 82 202 Z" fill="#b58bd0"/><circle cx="110" cy="162" r="11" fill="${S}"/><path d="M98 202 Q110 178 122 202 Z" fill="#c98bb0"/>`;
+      case 7: return `<rect x="56" y="158" width="68" height="42" rx="6" fill="${PUR}"/><circle cx="66" cy="204" r="8" fill="#7a5b3a"/><circle cx="114" cy="204" r="8" fill="#7a5b3a"/><circle cx="90" cy="130" r="12" fill="${S}"/><path d="M76 160 Q90 138 104 160 Z" fill="#9b7bbf"/><circle cx="58" cy="148" r="9" fill="#e9c39a"/><circle cx="122" cy="148" r="9" fill="#e9c39a"/><text x="90" y="92" text-anchor="middle" font-size="11" fill="${G}">✦ ✦ ✦</text>`;
+      case 8: return `<circle cx="90" cy="148" r="12" fill="${S}"/><path d="M74 196 Q90 168 106 196 Z" fill="#c98bb0"/><circle cx="90" cy="118" r="22" fill="#e0b15a"/><circle cx="80" cy="114" r="9" fill="#caa" opacity=".6"/><circle cx="100" cy="114" r="9" fill="#caa" opacity=".6"/><path d="M82 150 q8 8 16 0" stroke="#6b4f33" stroke-width="2" fill="none"/>`;
+      case 9: return `<line x1="118" y1="78" x2="100" y2="220" stroke="#7a5b3a" stroke-width="4"/><circle cx="80" cy="142" r="12" fill="${S}"/><path d="M66 188 Q80 162 94 188 Z" fill="#9b9bbf"/><circle cx="62" cy="120" r="10" fill="#f3c14b"/><circle cx="62" cy="120" r="4" fill="#fff"/>`;
+      case 10: return `<circle cx="90" cy="150" r="46" fill="none" stroke="${G}" stroke-width="3"/><circle cx="90" cy="150" r="30" fill="none" stroke="${G}" stroke-width="2"/><line x1="90" y1="104" x2="90" y2="196" stroke="${G}"/><line x1="44" y1="150" x2="136" y2="150" stroke="${G}"/><circle cx="90" cy="104" r="6" fill="#9b7bbf"/><circle cx="136" cy="150" r="6" fill="#9b7bbf"/><circle cx="90" cy="196" r="6" fill="#9b7bbf"/>`;
+      case 11: return `<line x1="90" y1="92" x2="90" y2="200" stroke="#9b9bbf" stroke-width="3"/><line x1="78" y1="100" x2="102" y2="100" stroke="#9b9bbf" stroke-width="3"/><path d="M62 132 L90 118 L118 132" stroke="${G}" stroke-width="2" fill="none"/><line x1="90" y1="118" x2="90" y2="144" stroke="${G}"/><circle cx="62" cy="132" r="5" fill="${G}"/><circle cx="118" cy="132" r="5" fill="${G}"/><circle cx="90" cy="162" r="11" fill="${S}"/><path d="M76 200 Q90 176 104 200 Z" fill="#9b7bbf"/>`;
+      case 12: return `<line x1="60" y1="70" x2="120" y2="70" stroke="#7a5b3a" stroke-width="4"/><line x1="90" y1="70" x2="90" y2="100" stroke="#7a5b3a" stroke-width="4"/><circle cx="90" cy="212" r="12" fill="${S}"/><path d="M78 168 Q90 196 102 168 Z" fill="${PUR}"/><line x1="66" y1="200" x2="60" y2="170" stroke="${PUR}" stroke-width="3"/><line x1="114" y1="200" x2="120" y2="170" stroke="${PUR}" stroke-width="3"/>`;
+      case 13: return `<path d="M70 150 q22 -12 42 0 l-4 42 q-17 8 -34 0 Z" fill="#7a5b3a"/><circle cx="62" cy="138" r="9" fill="#e9eef5"/><line x1="56" y1="118" x2="68" y2="118" stroke="#666" stroke-width="3"/><line x1="112" y1="118" x2="112" y2="78" stroke="#666" stroke-width="2"/><path d="M112 80 L130 88 L112 96 Z" fill="#9b7bbf"/>`;
+      case 14: return `<circle cx="90" cy="128" r="12" fill="${S}"/><path d="M74 174 Q90 146 106 174 Z" fill="#cfe3f2"/><path d="M58 200 q12 -22 24 0" stroke="${G}" stroke-width="2" fill="none"/><path d="M98 200 q12 -22 24 0" stroke="${G}" stroke-width="2" fill="none"/><path d="M68 216 q22 10 44 0" stroke="#5b8ed0" stroke-width="2" fill="none"/>`;
+      case 15: return `<path d="M78 96 L82 84 L90 92 L98 84 L102 96 Z" fill="#7a3b3b"/><circle cx="90" cy="120" r="13" fill="#caa"/><path d="M74 166 Q90 140 106 166 Z" fill="#7a3b3b"/><circle cx="70" cy="196" r="7" fill="${S}"/><circle cx="110" cy="196" r="7" fill="${S}"/><line x1="70" y1="203" x2="110" y2="203" stroke="#777"/><path d="M90 70 l-8 12 8 4 8 -4 Z" fill="#9b7bbf"/>`;
+      case 16: return `<rect x="74" y="120" width="32" height="100" rx="3" fill="#b89a6b"/><rect x="68" y="112" width="44" height="12" rx="3" fill="#a8895a"/><path d="M100 78 L88 120 L96 118 L82 152" stroke="#f3c14b" stroke-width="3" fill="none"/><path d="M78 116 l8 -8 4 8 8 -8" fill="#e0736b"/><circle cx="68" cy="150" r="6" fill="${S}"/><circle cx="112" cy="160" r="6" fill="${S}"/>`;
+      case 17: return `${star8(90, 96, 22)}<circle cx="60" cy="120" r="3" fill="#f3c14b"/><circle cx="120" cy="120" r="3" fill="#f3c14b"/><circle cx="70" cy="150" r="2.5" fill="#f3c14b"/><circle cx="110" cy="150" r="2.5" fill="#f3c14b"/><circle cx="90" cy="170" r="11" fill="${S}"/><path d="M76 212 Q90 188 104 212 Z" fill="#cfe3f2"/><path d="M70 214 q-6 8 -2 16" stroke="#5b8ed0" stroke-width="2" fill="none"/><path d="M110 214 q6 8 2 16" stroke="#5b8ed0" stroke-width="2" fill="none"/>`;
+      case 18: return `${moon(90, 92, 22)}<rect x="50" y="150" width="16" height="60" fill="#9b8fb0"/><rect x="114" y="150" width="16" height="60" fill="#9b8fb0"/><path d="M90 212 q-14 -10 0 -26 q14 16 0 26" stroke="#cbb08a" fill="none"/><circle cx="64" cy="200" r="7" fill="#7a6b5a"/><circle cx="116" cy="200" r="7" fill="#7a6b5a"/><path d="M84 224 q6 6 12 0" stroke="#c1773a" stroke-width="2" fill="none"/>`;
+      case 19: return `${sun(90, 90, 26)}<circle cx="90" cy="162" r="10" fill="${S}"/><path d="M78 202 Q90 180 102 202 Z" fill="#f3c14b"/><rect x="74" y="198" width="32" height="8" rx="4" fill="#9b7bbf"/><line x1="56" y1="216" x2="56" y2="190" stroke="#7bbf6a" stroke-width="2"/><circle cx="56" cy="186" r="6" fill="#f3c14b"/><line x1="124" y1="216" x2="124" y2="190" stroke="#7bbf6a" stroke-width="2"/><circle cx="124" cy="186" r="6" fill="#f3c14b"/><rect x="40" y="216" width="100" height="14" rx="4" fill="#cdb68a" opacity=".6"/>`;
+      case 20: return `<circle cx="90" cy="100" r="12" fill="${S}"/><path d="M76 140 Q90 116 104 140 Z" fill="#cfe3f2"/><line x1="104" y1="96" x2="132" y2="80" stroke="#f3c14b" stroke-width="3"/><path d="M132 72 l10 2 -8 8 Z" fill="#f3c14b"/><rect x="64" y="200" width="14" height="22" rx="3" fill="#b89a6b"/><rect x="86" y="195" width="14" height="27" rx="3" fill="#b89a6b"/><rect x="108" y="200" width="14" height="22" rx="3" fill="#b89a6b"/><circle cx="71" cy="196" r="5" fill="${S}"/><circle cx="93" cy="191" r="5" fill="${S}"/><circle cx="115" cy="196" r="5" fill="${S}"/>`;
+      case 21: return `<ellipse cx="90" cy="155" rx="48" ry="64" fill="none" stroke="#7bbf6a" stroke-width="3"/><circle cx="90" cy="155" r="13" fill="${S}"/><path d="M74 200 Q90 175 106 200 Z" fill="#c98bb0"/><circle cx="44" cy="100" r="6" fill="#9b7bbf"/><circle cx="136" cy="100" r="6" fill="#9b7bbf"/><circle cx="44" cy="210" r="6" fill="#9b7bbf"/><circle cx="136" cy="210" r="6" fill="#9b7bbf"/>`;
+      default: return `<text x="90" y="160" text-anchor="middle" font-size="40" fill="${G}">✦</text>`;
+    }
+  }
+  // 小阿尔卡纳：数字牌按 pip 布局摆花色；宫廷牌画人物
+  function pipPositions(n) {
+    const L = 52, R = 128, M = 90, T = 100, B = 210;
+    switch (n) {
+      case 1: return [[M, 155]];
+      case 2: return [[M, T], [M, B]];
+      case 3: return [[M, T], [M, 155], [M, B]];
+      case 4: return [[L, T], [R, T], [L, B], [R, B]];
+      case 5: return [[L, T], [R, T], [M, 155], [L, B], [R, B]];
+      case 6: return [[L, T], [M, T], [R, T], [L, B], [M, B], [R, B]];
+      case 7: return [[L, T], [M, T], [R, T], [M, 155], [L, B], [M, B], [R, B]];
+      case 8: return [[L, T], [R, T], [L, 127], [R, 127], [L, 183], [R, 183], [L, B], [R, B]];
+      case 9: return [[L, T], [M, T], [R, T], [L, 155], [M, 155], [R, 155], [L, B], [M, B], [R, B]];
+      case 10: { const a = []; for (let k = 0; k < 5; k++) { const y = 92 + k * 29; a.push([L, y], [R, y]); } return a; }
+      default: return [[M, 155]];
+    }
+  }
+  function minorScene(card) {
+    const color = SUIT_COLOR[card.suit] || '#b8893b';
+    const S = '#e9c39a';
+    if (card.num <= 10) {
+      return pipPositions(card.num).map(([x, y]) => tarotSuitSVG(card.suit, x, y, 30, color)).join('');
+    }
+    const robe = color; const crown = card.num >= 13; const isKing = card.num === 14;
+    let s = `<circle cx="90" cy="120" r="15" fill="${S}"/>`;
+    if (crown) s += `<path d="M78 108 L84 98 L90 106 L96 98 L102 108 Z" fill="#e9b94b"/>`;
+    if (isKing) s += `<path d="M80 138 Q90 132 100 138" stroke="#caa" stroke-width="2" fill="none"/>`;
+    s += `<path d="M64 212 Q90 132 116 212 Z" fill="${robe}" fill-opacity="0.92"/>`;
+    s += tarotSuitSVG(card.suit, 120, 152, 30, color);
+    return s;
+  }
+  // 单张牌 SVG（花边边框 + 牌名 + 罗马数字 + 场景）
+  function tarotCardSVG(item) {
+    const c = item.card, rev = item.reversed;
+    const border = '#b8893b', border2 = '#8a6326', ink = '#3a2a1a', bg1 = '#fcf6e8', bg2 = '#f1e0c4';
+    const scene = c.kind === 'major' ? majorScene(c.num - 1) : minorScene(c);
+    const inner = `
+      <rect x="12" y="12" width="156" height="276" rx="14" fill="${bg1}" stroke="${border}" stroke-width="3"/>
+      <rect x="20" y="20" width="140" height="260" rx="9" fill="${bg2}" fill-opacity="0.5" stroke="${border}" stroke-width="1.2" stroke-opacity="0.55"/>
+      <rect x="24" y="24" width="132" height="30" rx="7" fill="${border}" fill-opacity="0.14"/>
+      <text x="90" y="44" text-anchor="middle" font-size="15" font-weight="700" fill="${ink}">${escapeHtml(c.name)}</text>
+      <g class="tarot-scene">${scene}</g>
+      <text x="90" y="276" text-anchor="middle" font-size="17" font-weight="700" fill="${border2}" letter-spacing="1.5">${c.roman}</text>
+      <text x="28" y="20" font-size="11" fill="${border}" opacity="0.8">✦</text>
+      <text x="152" y="20" font-size="11" fill="${border}" opacity="0.8" text-anchor="end">✦</text>
+      <text x="28" y="293" font-size="11" fill="${border}" opacity="0.8">✦</text>
+      <text x="152" y="293" font-size="11" fill="${border}" opacity="0.8" text-anchor="end">✦</text>`;
+    const rot = rev ? ' transform="rotate(180 90 150)"' : '';
+    return `<svg class="tarot-svg" viewBox="0 0 180 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${escapeHtml(c.name)} ${rev ? '逆位' : '正位'}"><g${rot}>${inner}</g></svg>`;
+  }
+  // 排阵综合解读（参考位置，而非单张孤立解读）
+  function tarotSpreadReading(question, spread, picks) {
+    const q = (question || '').trim();
+    const qc = q ? (q.length > 22 ? q.slice(0, 22) + '…' : q) : '';
+    let out = '';
+    if (qc) out += `就你的问题「${escapeHtml(qc)}」，牌阵这样回应你：\n\n`;
+    else out += `这是一组关于「${spread.name}」的指引：\n\n`;
+    picks.forEach((p, i) => {
+      const role = spread.roles[i], hint = spread.roleHint[i];
+      const orient = p.reversed ? '逆位' : '正位';
+      const mean = p.reversed ? p.card.reversed : p.card.upright;
+      out += `【${role} · ${p.card.name}${orient}】\n${mean}（这一张落在「${role}」：${hint}）\n\n`;
+    });
+    const names = picks.map(p => `${p.card.name}${p.reversed ? '逆' : ''}`).join('、');
+    out += `整体来看，${names} 串起一条线：`;
+    if (qc) out += `把目光放回「${escapeHtml(qc)}」——过去给了你底色，现在是你最能着力之处，未来提示了柔软调整的方向。不必一次解决，先稳住当下这一张，其余会自然展开。`;
+    else out += `过去是来路，现在是着力点，未来是松动的可能。先接住「现在」这张牌的信号，其余会自然展开。`;
+    return out;
+  }
+  function upHTML(p, i) {
+    return `<div class="tarot-up" data-i="${i}">${tarotCardSVG(p)}<div class="tarot-up-name">${escapeHtml(p.card.name)} <span class="orient ${p.reversed ? 'rev' : ''}">${p.reversed ? '逆位' : '正位'}</span></div></div>`;
+  }
+  function renderPositions() {
+    const box = document.getElementById('tarotPositions');
+    if (!box || !tarotState) return;
+    const spread = tarotState.spread;
+    const tag = document.getElementById('posCardTag');
+    if (tag) tag.textContent = '牌阵 · ' + spread.name;
+    box.innerHTML = tarotState.positions.map((p, i) => `<div class="tarot-pos" id="pos-${i}"><div class="tarot-pos-label">${spread.roles[i]}</div><div class="tarot-card-wrap">${upHTML(p, i)}</div></div>`).join('');
+    box.querySelectorAll('.tarot-up').forEach(el => el.addEventListener('click', () => openLightbox(tarotState.positions[+el.dataset.i])));
+  }
+  function renderRead() {
+    const read = document.getElementById('tarotRead');
+    if (!read || !tarotState) return;
+    if (!tarotState.positions.length) { read.style.display = 'none'; read.innerHTML = ''; return; }
+    const spread = tarotState.spread;
+    const cards = tarotState.positions.map((p, i) => `<div class="tarot-big"><div class="tarot-big-svg">${tarotCardSVG(p)}</div><div class="tarot-big-role">${spread.roles[i]}</div><div class="tarot-big-name">${escapeHtml(p.card.name)} <span class="orient ${p.reversed ? 'rev' : ''}">${p.reversed ? '逆位' : '正位'}</span></div></div>`).join('');
+    const reading = tarotSpreadReading(tarotQuestion, spread, tarotState.positions);
+    read.innerHTML = `<div class="card-tag">排阵解读</div><div class="tarot-big-row">${cards}</div><div class="tarot-reading">${reading.split('\n').map(l => l.trim() ? `<p>${l}</p>` : '').join('')}</div>`;
+    read.style.display = 'block';
+  }
+  function openLightbox(item) {
+    const lb = document.getElementById('tarotLightbox');
+    if (!lb) return;
+    lb.querySelector('.lb-body').innerHTML = tarotCardSVG(item) + `<div class="lb-name">${escapeHtml(item.card.name)} ${item.reversed ? '逆位' : '正位'}</div>`;
+    lb.style.display = 'flex';
+  }
+  // 抽牌进度
+  function updateProgress() {
+    if (!tarotDraw) return;
+    const fill = document.getElementById('tarotProgressFill');
+    const label = document.getElementById('tarotProgressLabel');
+    if (fill) fill.style.width = (tarotDraw.count / tarotDraw.n * 100) + '%';
+    if (label) label.textContent = `已抽 ${tarotDraw.count} / ${tarotDraw.n}`;
+  }
+  // 渲染 78 张牌背网格（已抽的牌当场翻开显示）
+  function renderDeckGrid() {
+    const grid = document.getElementById('tarotDeckGrid');
+    if (!grid || !tarotDraw) return;
+    grid.innerHTML = tarotDraw.order.map(cardIdx => {
+      const item = tarotDraw.picks[cardIdx];
+      if (item) {
+        return `<button type="button" class="tarot-deck-card drawn" disabled aria-label="${escapeHtml(item.card.name)}">${tarotCardSVG(item)}<span class="tarot-deck-check">✓</span></button>`;
+      }
+      return `<button type="button" class="tarot-deck-card" data-card="${cardIdx}" aria-label="抽这张牌"><span class="tarot-deck-back"><span class="tarot-deck-mark">✦</span></span></button>`;
+    }).join('');
+    grid.querySelectorAll('.tarot-deck-card[data-card]').forEach(el => el.addEventListener('click', () => drawCard(+el.dataset.card)));
+  }
+  // 用户亲手从 78 张里抽一张（顺序对应排阵位置）
+  function drawCard(cardIdx) {
+    if (!tarotDraw || tarotDraw.drawn[cardIdx] || tarotDraw.count >= tarotDraw.n) return;
+    const card = TAROT_DECK[cardIdx];
+    const item = { card, reversed: Math.random() < 0.5, revealed: true };
+    tarotDraw.drawn[cardIdx] = true;
+    tarotDraw.picks[cardIdx] = item;
+    tarotDraw.count++;
+    tarotState.positions.push(item);
+    updateProgress();
+    renderDeckGrid();
+    if (tarotDraw.count >= tarotDraw.n) setTimeout(showResult, 420);
+  }
+  // 进入抽牌阶段（洗牌：重排 78 张顺序，由用户亲手抽）
+  function startDraw() {
+    const spread = TAROT_SPREADS[tarotSpreadKey] || TAROT_SPREADS.time;
+    const n = spread.roles.length;
+    const order = TAROT_DECK.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = order[i]; order[i] = order[j]; order[j] = t; }
+    tarotDraw = { order, drawn: new Array(TAROT_DECK.length).fill(false), picks: {}, n, count: 0 };
+    tarotState = { spread, positions: [] };
+    tarotPhase = 'draw';
+    showTarotPhase();
+    const tag = document.getElementById('tarotDrawTag');
+    if (tag) tag.textContent = '从 78 张里抽 ' + n + ' 张 · ' + spread.name;
+    updateProgress();
+    renderDeckGrid();
+    toast(tarotQuestion ? '凭直觉抽牌吧 ✨' : '已洗牌～凭直觉抽牌，有问题会更准 ✨');
+  }
+  function showTarotPhase() {
+    const setup = document.getElementById('tarotSetup');
+    const draw = document.getElementById('tarotDraw');
+    const result = document.getElementById('tarotResult');
+    const back = document.getElementById('tarotBack');
+    if (setup) setup.style.display = tarotPhase === 'setup' ? 'block' : 'none';
+    if (draw) draw.style.display = tarotPhase === 'draw' ? 'block' : 'none';
+    if (result) result.style.display = tarotPhase === 'result' ? 'block' : 'none';
+    if (back) back.style.display = tarotPhase === 'setup' ? 'none' : 'inline-flex';
+    const read = document.getElementById('tarotRead');
+    if (read && tarotPhase !== 'result') { read.style.display = 'none'; read.innerHTML = ''; }
+    const posBox = document.getElementById('tarotPositions');
+    if (posBox && tarotPhase !== 'result') posBox.innerHTML = '';
+  }
+  function showResult() {
+    if (!tarotState) return;
+    tarotPhase = 'result';
+    showTarotPhase();
+    renderPositions();
+    renderRead();
+    toast('牌已翻开，看看牌阵想对你说什么 ✨');
+  }
+  function resetTarot() {
+    tarotPhase = 'setup';
+    tarotDraw = null;
+    tarotState = null;
+    const read = document.getElementById('tarotRead');
+    if (read) { read.style.display = 'none'; read.innerHTML = ''; }
+    showTarotPhase();
+  }
+  document.querySelectorAll('#spreadChips .spread-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#spreadChips .spread-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      tarotSpreadKey = chip.dataset.spread;
+    });
+  });
+  document.getElementById('btnShuffle').addEventListener('click', startDraw);
+  document.getElementById('btnReshuffle').addEventListener('click', startDraw);
+  document.getElementById('btnRedraw').addEventListener('click', startDraw);
+  document.getElementById('btnBackSetup').addEventListener('click', () => { tarotPhase = 'setup'; showTarotPhase(); });
+  document.getElementById('tarotBack').addEventListener('click', () => { tarotPhase = 'setup'; showTarotPhase(); });
+  const lbEl = document.getElementById('tarotLightbox');
+  if (lbEl) lbEl.addEventListener('click', e => { if (e.target.id === 'tarotLightbox') e.currentTarget.style.display = 'none'; });
 
   document.getElementById('btnDownload').addEventListener('click', async () => {
     if (!currentTrack) { toast('先点「生成」或选一首伴奏再下载哦'); return; }
@@ -1548,6 +2073,19 @@
     setActiveChip('#importGoalChips .chip', 'data-goal', chip.dataset.goal);
   });
 
+  // 伴奏库搜索 / 筛选
+  document.getElementById('libSearch').addEventListener('input', (e) => {
+    libQuery = e.target.value;
+    renderLibrary();
+  });
+  document.getElementById('libFilterChips').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    libFilter = chip.dataset.goal;
+    setActiveChip('#libFilterChips .chip', 'data-goal', chip.dataset.goal);
+    renderLibrary();
+  });
+
   document.getElementById('btnImportMusic').addEventListener('click', () => {
     document.getElementById('importFileInput').click();
   });
@@ -1562,7 +2100,7 @@
     }
     e.target.value = '';
     toast(`已导入 ${files.length} 首伴奏到「${importGoal}」主题`);
-    renderImportList();
+    renderLibrary();
   });
 
   async function renderImportList() {
@@ -1591,7 +2129,7 @@
       });
       div.querySelector('.del-import').addEventListener('click', async () => {
         await MusicStore.remove(t.id);
-        renderImportList();
+        renderLibrary();
         toast('已删除');
       });
       list.appendChild(div);
@@ -1602,10 +2140,68 @@
   const hash = (location.hash || '').replace('#', '');
   if (pages[hash]) navigate(hash);
 
+  // ===== 命理（八字四柱，本地计算）=====
+  let fateGender = '';
+  document.querySelectorAll('#fateGenderChips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      fateGender = c.dataset.gender;
+      document.querySelectorAll('#fateGenderChips .chip').forEach(x => x.classList.toggle('active', x === c));
+    });
+  });
+  document.getElementById('fateForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const dateVal = document.getElementById('fateDate').value;
+    if (!dateVal) { toast('请先选择出生日期'); return; }
+    const parts = dateVal.split('-').map(Number);
+    const y = parts[0], m = parts[1], d = parts[2];
+    const hourSel = document.getElementById('fateHour').value;
+    const hour = hourSel === '' ? null : Number(hourSel);
+    let res;
+    try {
+      res = computeBaZi(y, m, d, hour, fateGender);
+    } catch (err) {
+      toast('排盘出错，请检查日期');
+      return;
+    }
+    renderFate(res);
+    toast('已为你排盘 ✨');
+  });
+  function renderFate(res) {
+    const result = document.getElementById('fateResult');
+    if (!result) return;
+    result.style.display = 'block';
+    const pillars = [
+      { label: '年', p: res.year },
+      { label: '月', p: res.month },
+      { label: '日', p: res.day },
+      { label: '时', p: res.hour }
+    ];
+    document.getElementById('fatePillars').innerHTML = pillars.map(col => {
+      const top = col.p ? GAN[col.p.gan] : '？';
+      const bot = col.p ? ZHI[col.p.zhi] : '？';
+      return `<div class="fate-pillar"><div class="fate-col-label">${col.label}</div>`
+        + `<div class="fate-gz"><span class="fate-gan">${escapeHtml(top)}</span><span class="fate-zhi">${escapeHtml(bot)}</span></div></div>`;
+    }).join('');
+    document.getElementById('fateDayMaster').textContent = `${GAN[res.dayMaster]}（五行属${WU[res.dayMasterElement]}）`;
+    document.getElementById('fateStrength').textContent = res.strength;
+    const max = Math.max(1, ...res.elements);
+    document.getElementById('fateWuBars').innerHTML = WU.map((name, i) => {
+      const cnt = res.elements[i];
+      const pct = Math.round((cnt / max) * 100);
+      return `<div class="wu-bar-row"><span class="wu-name">${name}</span>`
+        + `<span class="wu-track"><span class="wu-fill" style="width:${pct}%;background:${WU_COLOR[i]}"></span></span>`
+        + `<span class="wu-cnt">${cnt}</span></div>`;
+    }).join('');
+    const note = getFateNote(res, new Date());
+    document.getElementById('fateNote').innerHTML =
+      `<p class="fate-line">${escapeHtml(note.line)}</p>`
+      + `<p class="fate-strength">${escapeHtml(note.strengthText)}</p>`
+      + `<p class="fate-yong">${escapeHtml(note.yongText)}</p>`;
+  }
+
   // ===== 初始化 =====
   computeAffirmation();
   renderHome();
   renderWishes();
-  renderMusicList();
-  renderImportList();
+  ensurePresets().then(renderLibrary).catch(() => renderLibrary());
 })();

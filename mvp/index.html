@@ -141,6 +141,10 @@
             <label>给这段音乐取名（可选）</label>
             <input type="text" id="musicName" placeholder="例如：睡前显化 · 爱情" maxlength="30">
           </div>
+          <label class="toggle-row">
+            <input type="checkbox" id="withScripture" checked>
+            <span>📜 加入经文伴读（高能量咒语，随音乐循环诵读）</span>
+          </label>
           <button type="submit" class="btn btn-primary btn-block" id="btnGenerate">生成我的定制音乐</button>
         </form>
       </div>
@@ -161,32 +165,168 @@
             <button class="btn btn-ghost" id="btnImmersive">沉浸</button>
           </div>
           <p class="player-note" id="playerNote"></p>
+          <div class="scripture-box" id="scriptureBox" style="display:none;">
+            <div class="scripture-head">
+              <span class="scripture-title">📜 高能量经文</span>
+              <button class="btn btn-ghost btn-sm" id="btnScripture" type="button">🔊 朗读</button>
+            </div>
+            <div class="scripture-text" id="scriptureText"></div>
+          </div>
         </div>
       </div>
 
-      <!-- 我的伴奏（导入 AI 生成或下载的本地音乐） -->
+      <!-- 伴奏库（内置免版权曲库 + 我的上传，统一搜索筛选） -->
       <div class="card">
-        <div class="card-tag">🎵 我的伴奏（导入本地音乐）</div>
-        <p class="upload-hint">把 AI 生成或下载的 mp3 上传到这里，作为定制 sub 的伴奏，随点随播、循环播放。</p>
-        <div class="form-group">
-          <label>伴奏主题</label>
-          <div class="chip-group" id="importGoalChips">
-            <button type="button" class="chip active" data-goal="爱情">爱情</button>
+        <div class="card-tag">🎵 伴奏库</div>
+        <p class="upload-hint">内置免版权合成曲库，开箱即播、可下载；也能上传你自己的 mp3 当专属伴奏。</p>
+        <div class="lib-tools">
+          <input type="text" id="libSearch" class="lib-search" placeholder="搜索曲名 / 标签 / 主题…">
+          <div class="chip-group lib-filter" id="libFilterChips">
+            <button type="button" class="chip active" data-goal="all">全部</button>
+            <button type="button" class="chip" data-goal="爱情">爱情</button>
             <button type="button" class="chip" data-goal="财富">财富</button>
             <button type="button" class="chip" data-goal="健康">健康</button>
             <button type="button" class="chip" data-goal="内在平静">内在平静</button>
             <button type="button" class="chip" data-goal="事业">事业</button>
           </div>
         </div>
-        <button type="button" class="btn btn-ghost btn-block" id="btnImportMusic">＋ 上传音乐文件</button>
-        <input type="file" id="importFileInput" accept="audio/*,.mp3,.wav,.m4a,.ogg" multiple style="display:none;">
-        <div class="music-list" id="importList"></div>
+        <div class="lib-section">
+          <div class="lib-section-title">✨ 预置曲库</div>
+          <div class="music-list" id="presetList"></div>
+        </div>
+        <div class="lib-section">
+          <div class="lib-section-title">📥 我上传的</div>
+          <div class="form-group">
+            <label>上传主题</label>
+            <div class="chip-group" id="importGoalChips">
+              <button type="button" class="chip active" data-goal="爱情">爱情</button>
+              <button type="button" class="chip" data-goal="财富">财富</button>
+              <button type="button" class="chip" data-goal="健康">健康</button>
+              <button type="button" class="chip" data-goal="内在平静">内在平静</button>
+              <button type="button" class="chip" data-goal="事业">事业</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-block" id="btnImportMusic">＋ 上传音乐文件</button>
+          <input type="file" id="importFileInput" accept="audio/*,.mp3,.wav,.m4a,.ogg" multiple style="display:none;">
+          <div class="music-list" id="importList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 页面：塔罗 -->
+    <section class="page" id="page-tarot">
+      <div class="page-head">
+        <button class="btn-back" id="tarotBack" style="display:none;">‹</button>
+        <h2 class="page-title" id="tarotTitle">🔮 塔罗 · 牌阵解读</h2>
       </div>
 
-      <!-- 音乐库 -->
+      <!-- 步骤一：提问 + 选排阵 -->
+      <div class="card" id="tarotSetup">
+        <div class="card-tag">先提问 · 选排阵 · 洗牌抽牌</div>
+        <div class="form-group">
+          <label>你此刻想问的问题（心里默念也行）</label>
+          <textarea id="tarotQuestion" class="tarot-question" rows="2" maxlength="60" placeholder="例如：这段时间我在感情上该注意什么？"></textarea>
+        </div>
+        <div class="form-group">
+          <label>选择排阵</label>
+          <div class="spread-chips" id="spreadChips">
+            <button type="button" class="spread-chip active" data-spread="time">三张阵 · 过去/现在/未来</button>
+            <button type="button" class="spread-chip" data-spread="rel">关系阵 · 你/对方/走向</button>
+            <button type="button" class="spread-chip" data-spread="choice">抉择阵 · 现状/A/B</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="btnShuffle">🔀 去洗牌抽牌</button>
+        <p class="tarot-tip" id="tarotTip">写下问题、选好排阵，再洗牌抽牌。</p>
+      </div>
+
+      <!-- 步骤二：从 78 张里亲手抽牌 -->
+      <div class="card" id="tarotDraw" style="display:none;">
+        <div class="card-tag" id="tarotDrawTag">凭直觉抽牌</div>
+        <div class="tarot-progress">
+          <div class="tarot-progress-bar"><span class="tarot-progress-fill" id="tarotProgressFill"></span></div>
+          <div class="tarot-progress-label" id="tarotProgressLabel">已抽 0 / 3</div>
+        </div>
+        <p class="tarot-tip" id="tarotDrawTip">闭上眼，凭第一直觉轻触牌背抽牌；抽满即自动开牌。</p>
+        <div class="tarot-deck-grid" id="tarotDeckGrid"></div>
+        <div class="tarot-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="btnBackSetup">返回修改</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btnReshuffle">重新洗牌</button>
+        </div>
+      </div>
+
+      <!-- 步骤三：牌阵结果 + 解读 -->
+      <div class="card" id="tarotResult" style="display:none;">
+        <div class="card-tag" id="posCardTag">牌阵</div>
+        <div class="tarot-positions" id="tarotPositions"></div>
+        <div class="tarot-actions" id="tarotResultActions" style="display:none;">
+          <button type="button" class="btn btn-ghost btn-sm" id="btnRedraw">重新抽牌</button>
+        </div>
+      </div>
+
+      <div class="card tarot-read-card" id="tarotRead" style="display:none;"></div>
+      <div class="tarot-lightbox" id="tarotLightbox" style="display:none;"><div class="lb-body"></div></div>
+    </section>
+
+    <!-- 页面：命理 -->
+    <section class="page" id="page-fate">
+      <div class="page-head">
+        <h2 class="page-title">📿 命理 · 八字</h2>
+      </div>
+
       <div class="card">
-        <div class="card-tag">音乐库（预设）</div>
-        <div class="music-list" id="musicList"></div>
+        <div class="card-tag">你的四柱八字</div>
+        <p class="upload-hint">输入出生信息，本地即时排盘。仅供趣味参考，不作专业命理依据。</p>
+        <form id="fateForm" class="music-form">
+          <div class="form-group">
+            <label>出生日期</label>
+            <input type="date" id="fateDate" required>
+          </div>
+          <div class="form-group">
+            <label>出生时辰（可选，越准越完整）</label>
+            <select id="fateHour">
+              <option value="">不详 / 暂不填</option>
+              <option value="0">子时 23:00–00:59</option>
+              <option value="1">丑时 01:00–02:59</option>
+              <option value="3">寅时 03:00–04:59</option>
+              <option value="5">卯时 05:00–06:59</option>
+              <option value="7">辰时 07:00–08:59</option>
+              <option value="9">巳时 09:00–10:59</option>
+              <option value="11">午时 11:00–12:59</option>
+              <option value="13">未时 13:00–14:59</option>
+              <option value="15">申时 15:00–16:59</option>
+              <option value="17">酉时 17:00–18:59</option>
+              <option value="19">戌时 19:00–20:59</option>
+              <option value="21">亥时 21:00–22:59</option>
+              <option value="23">晚子时 23:00–23:59（取次日日干）</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>性别（可选，仅作记录）</label>
+            <div class="chip-group" id="fateGenderChips">
+              <button type="button" class="chip" data-gender="男">男</button>
+              <button type="button" class="chip" data-gender="女">女</button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="btnFate">解读我的八字</button>
+        </form>
+      </div>
+
+      <div class="card fate-result" id="fateResult" style="display:none;">
+        <div class="fate-pillars" id="fatePillars"></div>
+        <div class="fate-row">
+          <span class="fate-k">日主</span>
+          <span class="fate-v" id="fateDayMaster"></span>
+        </div>
+        <div class="fate-row">
+          <span class="fate-k">身强身弱</span>
+          <span class="fate-v" id="fateStrength"></span>
+        </div>
+        <div class="fate-elements">
+          <div class="fate-elements-title">五行分布</div>
+          <div class="wu-bars" id="fateWuBars"></div>
+        </div>
+        <div class="fate-note" id="fateNote"></div>
+        <p class="fate-disclaimer">＊ 以上为趣味算法排盘，节气以公历近似日期估算，仅供自我觉察与放松参考，请勿用于人生重大决策。</p>
       </div>
     </section>
   </main>
@@ -204,6 +344,14 @@
     <button class="tab-item" data-nav="music">
       <span class="tab-icon">🎧</span>
       <span class="tab-label">音乐</span>
+    </button>
+    <button class="tab-item" data-nav="tarot">
+      <span class="tab-icon">🔮</span>
+      <span class="tab-label">塔罗</span>
+    </button>
+    <button class="tab-item" data-nav="fate">
+      <span class="tab-icon">📿</span>
+      <span class="tab-label">命理</span>
     </button>
   </nav>
 
@@ -245,6 +393,7 @@
       <canvas class="theme-fx"></canvas>
       <span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span><span class="orb o4"></span>
     </div>
+    <div class="ss-scripture" id="ssScripture" style="display:none;"></div>
     <div class="ss-content">
       <div class="ss-controls">
         <button class="btn btn-primary" id="btnSsPlay">暂停</button>
