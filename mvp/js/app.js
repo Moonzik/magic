@@ -9,12 +9,25 @@
       const raw = localStorage.getItem(STORE_KEY);
       if (raw) return JSON.parse(raw);
     } catch (e) {}
-    return { wishes: [], savedAffirmations: [], checkedIn: {} };
+    return { wishes: [], savedAffirmations: [], checkedIn: {}, profile: null, bazi: null, tarotHistory: [], stardiceHistory: [], ziweiHistory: [] };
   }
   function saveStore(s) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch (e) {}
   }
-  let store = loadStore();
+  // 兼容旧版本 / 残缺数据，保证各字段始终可用
+  function normalizeStore(s) {
+    s.wishes = Array.isArray(s.wishes) ? s.wishes : [];
+    s.savedAffirmations = Array.isArray(s.savedAffirmations) ? s.savedAffirmations : [];
+    s.tarotHistory = Array.isArray(s.tarotHistory) ? s.tarotHistory : [];
+    s.stardiceHistory = Array.isArray(s.stardiceHistory) ? s.stardiceHistory : [];
+    s.ziweiHistory = Array.isArray(s.ziweiHistory) ? s.ziweiHistory : [];
+    s.checkedIn = s.checkedIn && typeof s.checkedIn === 'object' ? s.checkedIn : {};
+    if (typeof s.muted !== 'boolean') s.muted = false;
+    if (!s.createdAt) s.createdAt = new Date().toISOString();
+    return s;
+  }
+  let store = normalizeStore(loadStore());
+  saveStore(store);
 
   // ===== 工具 =====
   function todayStr() {
@@ -85,25 +98,51 @@
   }
 
   // ===== 页面导航 =====
-  const pages = { home: 'page-home', wish: 'page-wish', music: 'page-music', tarot: 'page-tarot', fate: 'page-fate' };
+  const pages = { home: 'page-home', wish: 'page-wish', music: 'page-music', divination: 'page-divination', destiny: 'page-destiny', mine: 'page-mine' };
   function navigate(pageId) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(pages[pageId]).classList.add('active');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.nav === pageId));
     if (pageId === 'home') { computeAffirmation(); renderAffirmation(); }
     if (pageId === 'wish') { renderWishes(); }
-    if (pageId === 'tarot') { resetTarot(); }
-    if (pageId === 'fate') {
+    if (pageId === 'divination') { resetTarot(); renderAstroHistory(); showDivine('tarot'); }
+    if (pageId === 'destiny') {
       const fd = document.getElementById('fateDate');
       if (fd && !fd.value) {
         const t = new Date();
         fd.value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
       }
+      const zd = document.getElementById('ziweiDate');
+      if (zd && !zd.value) {
+        const t = new Date();
+        zd.value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+      }
+      showDestiny('fate');
     }
+    if (pageId === 'mine') { renderMine(); }
     window.scrollTo(0, 0);
   }
-  document.querySelectorAll('[data-nav]').forEach(el => {
-    el.addEventListener('click', () => navigate(el.dataset.nav));
+  // 合并板块：占卜（塔罗/星骰）与命理（八字/紫微）的子导航切换
+  function showDivine(sub) {
+    const t = document.getElementById('divTarot'), s = document.getElementById('divStardice');
+    if (t) t.style.display = sub === 'tarot' ? '' : 'none';
+    if (s) s.style.display = sub === 'stardice' ? '' : 'none';
+    document.querySelectorAll('#divTabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
+  }
+  function showDestiny(sub) {
+    const f = document.getElementById('destFate'), z = document.getElementById('destZiwei');
+    if (f) f.style.display = sub === 'fate' ? '' : 'none';
+    if (z) z.style.display = sub === 'ziwei' ? '' : 'none';
+    document.querySelectorAll('#destTabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
+  }
+  const divTabsEl = document.getElementById('divTabs');
+  if (divTabsEl) divTabsEl.addEventListener('click', (e) => { const b = e.target.closest('.subtab'); if (b) showDivine(b.dataset.sub); });
+  const destTabsEl = document.getElementById('destTabs');
+  if (destTabsEl) destTabsEl.addEventListener('click', (e) => { const b = e.target.closest('.subtab'); if (b) showDestiny(b.dataset.sub); });
+  // 事件委托：支持动态生成的 [data-nav] 按钮（如个人主页里的「去排盘」）
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-nav]');
+    if (el) { e.preventDefault(); navigate(el.dataset.nav); }
   });
 
   // ===== 首页渲染 =====
@@ -402,6 +441,22 @@
   let importAudio = null;      // 全局 <audio>，播放导入伴奏
   let importAudioUrl = null;   // 当前 objectURL，切换时回收
 
+  // ===== 统一混音上下文：让「定制 Sub（音乐）」与「肯定语（女声）」进入同一个声场、真正融合 =====
+  // 之前 SynthEngine 与 ScriptureReader 各开一个 AudioContext、女声还自带独立混响房间，听感像两路分开的声音；
+  // 现在两者共用这一个 mixCtx，女声的混响也挂在同一上下文里，音乐与女声天然叠在同一空间、融为一体。
+  let mixCtx = null;
+  function getMixCtx() {
+    try {
+      if (!mixCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        mixCtx = new AC();
+      }
+      if (mixCtx.state === 'suspended') mixCtx.resume();
+      return mixCtx;
+    } catch (e) { return null; }
+  }
+
   // ===== Web Audio 合成引擎（真实生成疗愈音乐：改编名曲旋律 + 和弦伴奏 + 极轻频率 + 双耳节拍）=====
   const SynthEngine = (() => {
     let ctx = null;
@@ -552,10 +607,8 @@
     }
 
     function ensureCtx() {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return null;
-      if (!ctx) ctx = new AC();
-      if (ctx.state === 'suspended') ctx.resume();
+      // 共用统一混音上下文，使合成音乐与肯定语女声在同一声场融合（而非两个独立 AudioContext 各放各的）
+      ctx = getMixCtx();
       return ctx;
     }
 
@@ -1340,8 +1393,7 @@
     if (c) c.classList.add('hide');
   }
 
-  // 沉浸模式经文：进入时渲染当前曲目经文，逐行呼吸式高亮（独立于播放器面板的朗读高亮）
-  let ssScriptureTimer = null;
+  // 沉浸模式经文：进入时渲染当前曲目经文，由 ScriptureReader 统一驱动（云端 TTS + 逐行高亮滚动）
   function renderSsScripture() {
     const box = document.getElementById('ssScripture');
     if (!box) return;
@@ -1351,20 +1403,22 @@
     box.innerHTML = currentTrack.scripture.map(l => '<div class="sr-line">' + escapeHtml(l) + '</div>').join('');
     box.style.display = 'flex';
   }
-  function startSsScriptureLoop() {
-    const box = document.getElementById('ssScripture');
-    if (!box || box.style.display === 'none') return;
-    const lines = Array.from(box.querySelectorAll('.sr-line'));
-    if (!lines.length) return;
-    let i = 0;
-    const hl = () => lines.forEach((el, idx) => el.classList.toggle('sr-active', idx === i));
-    hl(0);
-    ssScriptureTimer = setInterval(() => { i = (i + 1) % lines.length; hl(i); }, 3600);
-  }
-  function stopSsScriptureLoop() {
-    if (ssScriptureTimer) { clearInterval(ssScriptureTimer); ssScriptureTimer = null; }
-    const box = document.getElementById('ssScripture');
-    if (box) box.querySelectorAll('.sr-line').forEach(el => el.classList.remove('sr-active'));
+
+  // 进入沉浸/朗读前，确保「乐声」持续在播，让肯定语女声叠在乐底之上、而非孤立独白。
+  // 已有 Sub 在放则直接叠声；否则优先放当前定制的 Sub，都没有再放主页配乐兜底。
+  function ensureMusicForReading() {
+    if (SynthEngine.isPlaying() || (getImportAudio() && !getImportAudio().paused)) return; // 已有 Sub 在放，直接叠声
+    if (currentTrack && currentTrack.type === 'synth' && currentTrack.params) {
+      SplashMusic.pause();              // 放定制 Sub 时收掉主页配乐，避免两路音乐叠加
+      SynthEngine.start(currentTrack.params);
+      return;
+    }
+    if (currentTrack && currentTrack.type === 'import' && importAudioUrl && getImportAudio().src) {
+      SplashMusic.pause();
+      getImportAudio().play().catch(() => {});
+      return;
+    }
+    SplashMusic.start();                // 无 Sub 时保底放主页配乐，女声叠在乐底上
   }
 
   function openScreensaver() {
@@ -1372,8 +1426,9 @@
     const ss = document.getElementById('screensaver');
     updateSsPlayButton();
     ss.style.display = 'flex';
+    ensureMusicForReading();            // 先确保乐声在播（不暂停任何音乐），让女声叠在乐底之上 = 真正融合
     renderSsScripture();
-    startSsScriptureLoop();
+    ScriptureReader.start(currentTrack.scripture);   // 沉浸模式也走云端 TTS + 字幕同步
     requestAnimationFrame(() => requestAnimationFrame(() => {
       ss.classList.add('show');
       showSsControls();
@@ -1383,7 +1438,9 @@
   function closeScreensaver() {
     const ss = document.getElementById('screensaver');
     hideSsControlsNow();
-    stopSsScriptureLoop();
+    ScriptureReader.stop();   // 退出沉浸，停止经文朗读
+    // 退出沉浸：若定制 Sub 仍在播则保留（不恢复主页配乐，避免两路音乐叠加）；否则恢复主页配乐
+    if (!(SynthEngine.isPlaying() || (getImportAudio() && !getImportAudio().paused))) SplashMusic.resume();
     ss.classList.remove('show');
     setTimeout(() => { ss.style.display = 'none'; }, 450);
   }
@@ -1537,56 +1594,250 @@
   }
 
   // ===== 经文伴读（TTS 朗读 + 逐行高亮，无中文嗓音时退化为定时器高亮）=====
+  // 把高亮行平滑滚动到其滚动容器中央（像卡拉OK字幕跟随），不影响页面其它部分
+  function scrollActiveIntoView(el) {
+    if (!el) return;
+    const c = el.closest('.scripture-text, .ss-scripture');
+    if (!c) return;
+    const cr = c.getBoundingClientRect(), er = el.getBoundingClientRect();
+    const delta = (er.top + er.height / 2) - (cr.top + cr.height / 2);
+    if (delta) c.scrollTo({ top: c.scrollTop + delta, behavior: 'smooth' });
+  }
+
   const ScriptureReader = (() => {
     let reading = false;
-    let lineEls = [];
+    let textEls = [];
+    let ssEls = [];
     let timer = null;
-    function voice() {
+    let cloudAudio = null;          // 当前播放的云端 TTS 音频
+    let useSpeechFallback = false;  // 云端失败则整段回退系统语音
+    let cachedVoice = null;
+    // ===== 轻度空间混响（让女声更贴耳自然、与背景音乐相融，而非压在音乐之上）=====
+    let audioCtx = null, reverbWarm = null, reverbDry = null, reverbWet = null, reverbMaster = null, reverbConv = null;
+    function makeReverbIR(ctx, seconds, decay) {
+      const rate = ctx.sampleRate, len = Math.floor(rate * seconds);
+      const buf = ctx.createBuffer(2, len, rate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = buf.getChannelData(ch);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+      return buf;
+    }
+    function ensureAudioCtx() {
+      try {
+        if (!audioCtx) {
+          // 复用统一混音上下文：让女声的混响与定制 Sub 的音乐处在同一声场，自然融为一体
+          audioCtx = getMixCtx();
+          if (!audioCtx) return null;
+          reverbConv = audioCtx.createConvolver();
+          reverbConv.buffer = makeReverbIR(audioCtx, 1.6, 2.0);   // 克制的短混响，保留清晰人声、只添一点空间感，融入乐声
+          reverbWarm = audioCtx.createBiquadFilter();            // 轻度暖声中频，去掉数码尖锐感又不糊
+          reverbWarm.type = 'lowpass'; reverbWarm.frequency.value = 4500;
+          reverbDry = audioCtx.createGain(); reverbDry.gain.value = 0.80;   // 干声（原声本体，占主导更清晰）
+          reverbWet = audioCtx.createGain(); reverbWet.gain.value = 0.22;  // 湿声（混响尾音，轻一点）
+          reverbMaster = audioCtx.createGain(); reverbMaster.gain.value = 0.50; // 整体压成温柔的铺底层，叠在音乐之上而非盖过音乐
+          reverbWarm.connect(reverbDry); reverbWarm.connect(reverbConv); reverbConv.connect(reverbWet);
+          reverbDry.connect(reverbMaster); reverbWet.connect(reverbMaster);
+          reverbMaster.connect(audioCtx.destination);
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        try { window.__dbgAudioCtxState = audioCtx.state; } catch (e) {}
+        return audioCtx;
+      } catch (e) { return null; }
+    }
+    // 选取最温柔、带感情的自然女声：优先「在线/神经网络」语音与知名暖嗓女声，再按女声特征打分，最后回退任意中文嗓音
+    function scoreVoice(v) {
+      const n = (v.name || '') + ' ' + (v.lang || '') + ' ' + (v.voiceURI || '');
+      let s = 0;
+      if (/natural|neural|online|\(neural\)|云健|晓晓|xiaoxiao|雅婷|tingting|晓睿?/i.test(n)) s += 6;   // 神经网络 / 暖嗓女声最自然
+      if (/(女|晓晓|xiaoxiao|小艺|xiaoyi|瑶瑶|yaoyao|慧慧|huihui|雅雅|娜娜|xiaona|ting|female|云希)/i.test(n) && !/(男|nan|yun\s?xi|云希|云熙|kangkang|晓睿)/i.test(n)) s += 3;
+      if (/\bzh\b|cmn|chinese|中文|普通话/i.test(n)) s += 1;
+      return s;
+    }
+    function pickVoice() {
       if (!('speechSynthesis' in window)) return null;
       const vs = window.speechSynthesis.getVoices() || [];
-      return vs.find(v => /zh|cmn|Chinese/i.test((v.lang || '') + (v.name || ''))) || null;
+      if (!vs.length) return null;
+      const zh = vs.filter(v => /zh|cmn|chinese|中文|普通话/i.test((v.lang || '') + ' ' + (v.name || '')));
+      const pool = zh.length ? zh : vs;
+      return pool.slice().sort((a, b) => scoreVoice(b) - scoreVoice(a))[0] || null;
     }
-    function highlight(i) { lineEls.forEach((el, idx) => el.classList.toggle('sr-active', idx === i)); }
+    function refreshVoice() { const v = pickVoice(); if (v) cachedVoice = v; }
+    if ('speechSynthesis' in window) {
+      refreshVoice();
+      window.speechSynthesis.onvoiceschanged = refreshVoice;
+    }
+    function voice() { if (!cachedVoice) refreshVoice(); return cachedVoice; }
     function setBtn(txt) { const b = document.getElementById('btnScripture'); if (b) b.textContent = txt; }
+    function collect() {
+      textEls = Array.from(document.querySelectorAll('#scriptureText .sr-line'));
+      ssEls = Array.from(document.querySelectorAll('#ssScripture .sr-line'));
+    }
+    function highlight(i) {
+      textEls.forEach((el, idx) => el.classList.toggle('sr-active', idx === i));
+      ssEls.forEach((el, idx) => el.classList.toggle('sr-active', idx === i));
+      scrollActiveIntoView(textEls[i] || ssEls[i]);   // 字幕跟随：当前行平滑滚动到可见区域中央
+    }
+    function clearActive() {
+      textEls.forEach(el => el.classList.remove('sr-active'));
+      ssEls.forEach(el => el.classList.remove('sr-active'));
+    }
     function stop() {
-      reading = false;
+      reading = false; useSpeechFallback = false;
       if (timer) { clearTimeout(timer); timer = null; }
+      if (cloudAudio) { try { cloudAudio.pause(); cloudAudio.src = ''; } catch (e) {} cloudAudio = null; }
       if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
-      lineEls.forEach(el => el.classList.remove('sr-active'));
+      clearActive();
       setBtn('🔊 朗读');
     }
+
+    // ===== 云端 TTS：Edge 免费晓晓神经女声（zh-CN-XiaoxiaoNeural）=====
+    // 浏览器直连微软 Edge 语音合成端点；取 token → 建 WS → 发 SSML → 收音频。
+    // 任何环节失败（网络/CORS/无 token）都自动回退到系统语音，保证功能不中断。
+    function guid() {
+      const h = (n) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      return h(8) + '-' + h(4) + '-' + h(4) + '-' + h(4) + '-' + h(12);
+    }
+    let gecCache = { token: null, ver: null, ts: 0 };
+    function fetchGec() {
+      const now = Date.now();
+      if (gecCache.token && now - gecCache.ts < 300000) return Promise.resolve(gecCache);
+      return fetch('https://edge.microsoft.com/tts/capabilities', { cache: 'no-store' })
+        .then(r => {
+          const token = r.headers.get('Sec-MS-GEC');
+          const ver = r.headers.get('Sec-MS-GEC-Version') || '1';
+          if (!token) throw new Error('no-token');
+          gecCache = { token, ver, ts: Date.now() };
+          return gecCache;
+        });
+    }
+    function edgeTts(text) {
+      if (!('WebSocket' in window)) return Promise.reject(new Error('no-ws'));
+      return fetchGec().then(gec => new Promise((resolve, reject) => {
+        const url = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1'
+          + '?TrustedClientToken=6A5AA1D85F4D4FA0B17977C443219ED3'
+          + '&Sec-MS-GEC=' + encodeURIComponent(gec.token)
+          + '&Sec-MS-GEC-Version=' + encodeURIComponent(gec.ver)
+          + '&ConnectionId=' + guid() + '&SpeechRegion=eastus';
+        let ws;
+        try { ws = new WebSocket(url); } catch (e) { reject(e); return; }
+        ws.binaryType = 'arraybuffer';
+        const audio = [];
+        let acc = new Uint8Array(0);            // 跨消息累积的原始字节
+        const dec = new TextDecoder('utf-8');
+        const to = setTimeout(() => { try { ws.close(); } catch (e) {} reject(new Error('timeout')); }, 25000);
+        // 找到下一个 \r\n\r\n 头部结束位置（即文本头与音频体的分界）
+        function headerEndAt(buf, from) {
+          for (let i = from; i + 3 < buf.length; i++) {
+            if (buf[i] === 13 && buf[i + 1] === 10 && buf[i + 2] === 13 && buf[i + 3] === 10) return i;
+          }
+          return -1;
+        }
+        // 按 Content-Length 精确切分「文本头 + 音频体」，只把纯音频字节收进 audio，
+        // 避免把第二个音频块的文本头混入音频造成爆音 / 乱码声。
+        function drain() {
+          while (acc.length) {
+            const hEnd = headerEndAt(acc, 0);
+            if (hEnd < 0) break;                // 头部尚未收全
+            const headerText = dec.decode(acc.subarray(0, hEnd));
+            const m = /Content-Length:\s*(\d+)/i.exec(headerText);
+            const cl = m ? parseInt(m[1], 10) : 0;
+            const aStart = hEnd + 4;
+            if (!cl || aStart + cl > acc.length) break;   // 音频体尚未收全，等下一条消息
+            audio.push(acc.subarray(aStart, aStart + cl));
+            acc = acc.subarray(aStart + cl);    // 保留剩余（可能是下一段头部）
+          }
+        }
+        ws.onopen = () => {
+          ws.send("Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{\"context\":{\"synthesis\":{\"audio\":{\"metadataoptions\":{\"sentenceBoundaryEnabled\":false,\"wordBoundaryEnabled\":false},\"outputFormat\":\"audio-24khz-48kbitrate-mono-mp3\"}}}}");
+          const safe = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+          // 温柔、像疗愈导师在耳边轻声引导的晓晓神经女声：gentle 温柔风格 + 稍慢语速 + 略低音高 + 轻柔音量，
+          // 配合播放端克制的空间混响与同一混音上下文，让声音贴着音乐、温柔不人机（避免念经感与机器腔）。
+          const ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='zh-CN'>"
+            + "<voice name='zh-CN-XiaoxiaoNeural'><mstts:express-as style='gentle' styledegree='1.2'>"
+            + "<prosody rate='0.85' pitch='-2%' volume='soft'>" + safe + "</prosody></mstts:express-as></voice></speak>";
+          ws.send('X-RequestId:' + guid() + "\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n" + ssml);
+        };
+        ws.onmessage = (ev) => {
+          if (typeof ev.data === 'string') {
+            if (ev.data.indexOf('Path:turn.end') >= 0) {
+              clearTimeout(to);
+              try { ws.close(); } catch (e) {}
+              drain();   // 收尾前再切一次，避免最后一块音频被漏掉
+              if (audio.length) resolve(new Blob(audio, { type: 'audio/mpeg' }));
+              else reject(new Error('empty-audio'));
+            }
+            return;
+          }
+          // 二进制帧：累积后按 Content-Length 精确剥离文本头，只把纯音频字节收进 audio
+          const more = new Uint8Array(ev.data);
+          const merged = new Uint8Array(acc.length + more.length);
+          merged.set(acc, 0); merged.set(more, acc.length); acc = merged;
+          drain();
+        };
+        ws.onerror = () => { clearTimeout(to); reject(new Error('ws-error')); };
+      }));
+    }
+
+    // ===== 朗读主流程：逐行云端生成并顺序播放，字幕精确同步；失败回退系统语音 =====
     function read(lines) {
       stop();
-      lineEls = Array.from(document.querySelectorAll('#scriptureText .sr-line'));
+      collect();
       if (!lines || !lines.length) return false;
-      reading = true; setBtn('⏸ 停止');
+      reading = true; setBtn('⏸ 停止'); useSpeechFallback = false;
+      playLine(0, lines);
+      return true;
+    }
+    function playLine(i, lines) {
+      if (!reading) return;
+      if (i >= lines.length) { stop(); return; }
+      const next = () => { if (reading) setTimeout(() => playLine(i + 1, lines), 650); };
+      if (useSpeechFallback) { speakLine(i, lines); return; }
+      edgeTts(lines[i]).then(blob => {
+        if (!reading) return;
+        const url = URL.createObjectURL(blob);
+        highlight(i);
+        const a = new Audio(url); cloudAudio = a;
+        // 经空间混响链路播放：女声带上圣殿般尾音、暖声中频，整体音量压低，与背景音乐融为一体。
+        // 仅当 AudioContext 已处于 running（用户手势已激活）才接入混响；否则直连播放，
+        // 避免 suspended 的 AudioContext 卡住媒体元素导致 onended 永不触发、朗读停在第 0 行。
+        const ctx = ensureAudioCtx();
+        let routed = false;
+        if (ctx && ctx.state === 'running') {
+          try { const src = ctx.createMediaElementSource(a); src.connect(reverbWarm); a.volume = 1; routed = true; }
+          catch (e) { routed = false; }
+        }
+        if (!routed) a.volume = 0.7;
+        if (ctx && ctx.state === 'suspended') { try { ctx.resume().catch(() => {}); } catch (e) {} } // 尝试激活，供后续行使用混响
+        const finish = () => { if (wd) { clearTimeout(wd); wd = null; } try { URL.revokeObjectURL(url); } catch (e) {} cloudAudio = null; next(); };
+        a.onended = finish;
+        a.onerror = finish;
+        const p = a.play(); if (p && p.catch) p.catch(() => next());
+        // 看门狗：任何异常导致 onended 未触发时，最多 16s 强制推进下一行，杜绝永久卡住
+        const wd = setTimeout(() => { if (reading && cloudAudio === a) { try { a.pause(); } catch (e) {} finish(); } }, 16000);
+      }).catch(() => { useSpeechFallback = true; speakLine(i, lines); });  // 本句及之后改用系统语音
+    }
+    function speakLine(i, lines) {
+      if (!reading) return;
+      if (i >= lines.length) { stop(); return; }
+      highlight(i);
       const synth = window.speechSynthesis;
       if (synth && voice()) {
-        let i = 0;
-        const next = () => {
-          if (!reading) return;
-          if (i >= lines.length) { stop(); return; }
-          highlight(i);
-          const u = new SpeechSynthesisUtterance(lines[i]);
-          u.lang = 'zh-CN'; const v = voice(); if (v) u.voice = v;
-          u.rate = 0.9; u.pitch = 1.0;
-          u.onend = () => { if (!reading) return; i++; next(); };
-          u.onerror = () => { if (!reading) return; i++; next(); };
-          try { synth.speak(u); } catch (e) { if (!reading) return; i++; next(); }
+        const u = new SpeechSynthesisUtterance(lines[i]);
+        u.lang = 'zh-CN'; const v = voice(); if (v) u.voice = v;
+        u.rate = 0.85; u.pitch = 1.0 + 0.02 * Math.sin(i * 0.8); u.volume = 0.85;   // 稍慢、自然音高、温柔轻声，像疗愈导师在说话
+        u.onend = () => { if (!reading) return; setTimeout(() => speakLine(i + 1, lines), 820); };
+        u.onerror = () => { if (!reading) return; speakLine(i + 1, lines); };
+        try { synth.speak(u); } catch (e) { if (!reading) return; speakLine(i + 1, lines); }
+      } else {
+        let j = i;
+        const step = () => {
+          if (!reading) return; highlight(j);
+          if (++j >= lines.length) { stop(); return; }
+          timer = setTimeout(step, 3600);
         };
-        next();
-        return true;
+        step();
       }
-      // 退化：无中文嗓音时按行定时高亮（无声但可见）
-      let i = 0;
-      const step = () => {
-        if (!reading) return;
-        highlight(i);
-        if (++i >= lines.length) { stop(); return; }
-        timer = setTimeout(step, 3200);
-      };
-      step();
-      return true;
     }
     return {
       render(lines) {
@@ -1666,7 +1917,7 @@
       const sub = `${musicFreq}Hz · ${params.styleName} · ${params.melody.label}${fxTag} · ${musicDur} 分钟 · ${aiNote ? 'AI 已理解你的愿望' : meta.tip}`;
       // 经文伴读：勾选时按目标取一段经文，并随播放自动诵读
       const withScr = document.getElementById('withScripture') && document.getElementById('withScripture').checked;
-      const scripture = withScr ? pickScripture(musicGoal, (freq * 7 + beat * 13 + (wishText ? wishText.length : 0))) : [];
+      const scripture = withScr ? pickScripture(musicGoal, 0, true) : [];
       showPlayer(meta.icon, customName || `定制 Sub · ${musicGoal}`, sub, 'synth', { params, scripture, scriptureAuto: withScr });
       if (aiNote) document.getElementById('playerNote').textContent = '🪄 ' + aiNote;
       toast(aiNote ? 'AI 定制完成 ✨' : '定制音乐已生成 ✨');
@@ -1698,7 +1949,9 @@
         a.pause();
         setPlayButton(false);
         ScriptureReader.stop();
+        SplashMusic.resume();   // 停止定制 Sub，恢复主页配乐
       } else {
+        SplashMusic.pause();    // 播放定制 Sub，先关掉主页配乐避免叠音
         a.play().then(() => setPlayButton(true)).catch(() => toast('播放失败，请重试'));
       }
       return;
@@ -1707,7 +1960,9 @@
       SynthEngine.stop();
       setPlayButton(false);
       ScriptureReader.stop();
+      SplashMusic.resume();     // 停止定制 Sub，恢复主页配乐
     } else {
+      SplashMusic.pause();      // 播放定制 Sub，先关掉主页配乐避免叠音
       if (SynthEngine.start(currentTrack.params)) {
         setPlayButton(true);
         toast('正在播放 ✨');
@@ -1720,9 +1975,107 @@
 
   // 经文伴读：手动朗读 / 停止（独立于音乐，可单独诵读）
   document.getElementById('btnScripture').addEventListener('click', () => {
-    if (!currentTrack || !currentTrack.scripture || !currentTrack.scripture.length) { toast('这首没有附带经文哦'); return; }
+    if (!currentTrack || !currentTrack.scripture || !currentTrack.scripture.length) { toast('这首没有附带高能量肯定语哦'); return; }
     ScriptureReader.toggle(currentTrack.scripture);
   });
+
+  // ===== 星骰（西方星象骰 · Astral Dice）=====
+  // 三枚骰：行星骰(什么能量) / 星座骰(以什么姿态) / 宫位骰(落在哪个人生领域)
+  const ASTRAL = {
+    planets: [
+      { sym: '☉', name: '太阳', meaning: '自我、意志与生命力的核心，代表你最想被看见、被点燃的部分。' },
+      { sym: '☽', name: '月亮', meaning: '情绪、直觉与潜意识，代表你当下容易被牵动的内在潮汐。' },
+      { sym: '☿', name: '水星', meaning: '沟通、思维与信息，代表需要被说清、被理解或被安排的某事。' },
+      { sym: '♀', name: '金星', meaning: '爱、美与价值，代表你渴望靠近、珍惜或为之心动的人与事。' },
+      { sym: '♂', name: '火星', meaning: '行动、欲望与能量，代表需要你主动推动、或正消耗你力气的课题。' },
+      { sym: '♃', name: '木星', meaning: '扩张、幸运与成长，代表正在变大、值得你信任与放手的契机。' },
+      { sym: '♄', name: '土星', meaning: '限制、责任与结构，代表需要耐心、纪律或面对的现实功课。' },
+      { sym: '♅', name: '天王星', meaning: '突变、自由与革新，代表突如其来的转机或你想挣脱的框架。' },
+      { sym: '♆', name: '海王星', meaning: '灵性、梦想与消融，代表需要被温柔以待、或别太当真的幻象。' },
+      { sym: '♇', name: '冥王星', meaning: '转化、深层与重生，代表正在深处瓦解、酝酿着重生的某件事。' }
+    ],
+    signs: [
+      { sym: '♈', name: '白羊', meaning: '开创、直接、带着一股冲劲去启动。' },
+      { sym: '♉', name: '金牛', meaning: '稳定、感官、慢慢落地才踏实。' },
+      { sym: '♊', name: '双子', meaning: '沟通、多变、用交流与好奇去化解。' },
+      { sym: '♋', name: '巨蟹', meaning: '情感、守护、回到关系与家的温度里。' },
+      { sym: '♌', name: '狮子', meaning: '表现、自信、大方地让光照出来。' },
+      { sym: '♍', name: '处女', meaning: '细致、服务、把细节一一理顺。' },
+      { sym: '♎', name: '天秤', meaning: '平衡、关系、在两端之间找到和谐。' },
+      { sym: '♏', name: '天蝎', meaning: '深度、强烈、往更里面去看见真相。' },
+      { sym: '♐', name: '射手', meaning: '探索、信念、带着希望往远处走。' },
+      { sym: '♑', name: '摩羯', meaning: '纪律、成就、用踏实一步步垒起来。' },
+      { sym: '♒', name: '水瓶', meaning: '独立、革新、跳出框框看未来。' },
+      { sym: '♓', name: '双鱼', meaning: '共情、梦幻、用柔软与信任去承接。' }
+    ],
+    houses: [
+      { n: 1, name: '第一宫', area: '自我与出发', meaning: '关于你自己的状态、外表与一个新的开始。' },
+      { n: 2, name: '第二宫', area: '财富与价值', meaning: '关于你的资源、金钱与真正看重的东西。' },
+      { n: 3, name: '第三宫', area: '沟通与学习', meaning: '关于表达、学习、邻里与近处的关系。' },
+      { n: 4, name: '第四宫', area: '家庭与根基', meaning: '关于家、安全感与你内在的根。' },
+      { n: 5, name: '第五宫', area: '创造与恋爱', meaning: '关于创造、心动、玩耍与表达爱。' },
+      { n: 6, name: '第六宫', area: '健康与日常', meaning: '关于身体、节奏与每天的小事。' },
+      { n: 7, name: '第七宫', area: '关系与伴侣', meaning: '关于重要的他人、合作与一对一的相处。' },
+      { n: 8, name: '第八宫', area: '深层与共享', meaning: '关于深处的纠缠、共享与转化。' },
+      { n: 9, name: '第九宫', area: '信念与远行', meaning: '关于信仰、远方、学习与更大的世界。' },
+      { n: 10, name: '第十宫', area: '事业与成就', meaning: '关于目标、公众形象与你想要被认可的事。' },
+      { n: 11, name: '第十一宫', area: '社群与希望', meaning: '关于朋友、群体与你心里的盼望。' },
+      { n: 12, name: '第十二宫', area: '潜识与放下', meaning: '关于潜意识、灵性与该轻轻放下的事。' }
+    ]
+  };
+  function pickAstral(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function astralInterpret(question, r) {
+    const q = question ? `关于你问的「${question}」——` : '';
+    const theme = `「${r.p.sym} ${r.p.name}」带来的是${r.p.meaning}`;
+    const manner = `它会以「${r.s.sym} ${r.s.name}」的方式展开：${r.s.meaning}`;
+    const field = `而这一切落在「${r.h.name} · ${r.h.area}」：${r.h.meaning}`;
+    const together = `合起来看，${r.p.name}的能量，借由${r.s.name}的姿态，在${r.h.area}这件事上轻轻显形。${q}不妨慢一点，顺着这份提示去体会，不必急着要答案。`;
+    return [theme, manner, field, together];
+  }
+  let astroQuestion = '';
+  const astroQEl = document.getElementById('astroQuestion');
+  if (astroQEl) astroQEl.addEventListener('input', () => { astroQuestion = astroQEl.value.trim(); });
+  function renderAstro(r) {
+    const dice = document.getElementById('astroDice');
+    if (dice) dice.innerHTML =
+      `<div class="astro-die"><div class="astro-sym">${r.p.sym}</div><div class="astro-die-name">${r.p.name}</div><div class="astro-die-role">行星 · 什么能量</div></div>` +
+      `<div class="astro-die"><div class="astro-sym">${r.s.sym}</div><div class="astro-die-name">${r.s.name}</div><div class="astro-die-role">星座 · 什么姿态</div></div>` +
+      `<div class="astro-die"><div class="astro-sym">${r.h.n}</div><div class="astro-die-name">${r.h.name}</div><div class="astro-die-role">宫位 · 哪个领域</div></div>`;
+    const reading = document.getElementById('astroReading');
+    if (reading) reading.innerHTML = astralInterpret(astroQuestion, r).map(l => `<p>${l}</p>`).join('');
+    const res = document.getElementById('astroResult');
+    if (res) res.style.display = 'block';
+    const rec = { ts: Date.now(), question: astroQuestion, planet: r.p.name, sign: r.s.name, house: r.h.name, area: r.h.area };
+    store.stardiceHistory = store.stardiceHistory || [];
+    store.stardiceHistory.unshift(rec);
+    if (store.stardiceHistory.length > 20) store.stardiceHistory = store.stardiceHistory.slice(0, 20);
+    saveStore(store);
+    renderAstroHistory();
+  }
+  function renderAstroHistory() {
+    const card = document.getElementById('astroHistoryCard');
+    const box = document.getElementById('astroHistory');
+    if (!card || !box) return;
+    const h = store.stardiceHistory || [];
+    if (!h.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    box.innerHTML = h.slice(0, 6).map(r => {
+      const d = new Date(r.ts); const ds = `${d.getMonth() + 1}月${d.getDate()}日`;
+      const q = r.question ? `<div class="mine-arc-text">${escapeHtml(r.question)}</div>` : '';
+      return `<div class="mine-arc-item"><div class="mine-arc-top"><span class="mine-arc-cat">${escapeHtml(r.planet)} · ${escapeHtml(r.sign)} · ${escapeHtml(r.house)}</span><span class="mine-arc-sub">${ds}</span></div>${q}<div class="mine-arc-sub">${escapeHtml(r.area)}</div></div>`;
+    }).join('');
+  }
+  function doAstroRoll() {
+    const dice = document.getElementById('astroDice');
+    if (dice) dice.innerHTML = '<div class="astro-die astro-rolling">🎲</div><div class="astro-die astro-rolling">🎲</div><div class="astro-die astro-rolling">🎲</div>';
+    const res = document.getElementById('astroResult'); if (res) res.style.display = 'block';
+    toast('星骰转动中… 🎲');
+    setTimeout(() => { renderAstro({ p: pickAstral(ASTRAL.planets), s: pickAstral(ASTRAL.signs), h: pickAstral(ASTRAL.houses) }); toast('星骰落定 ✨'); }, 800);
+  }
+  const astroRollBtn = document.getElementById('btnAstroRoll');
+  if (astroRollBtn) astroRollBtn.addEventListener('click', doAstroRoll);
+  const astroAgainBtn = document.getElementById('btnAstroAgain');
+  if (astroAgainBtn) astroAgainBtn.addEventListener('click', doAstroRoll);
 
   // ===== 塔罗 · 牌阵解读（选排阵 → 去洗牌 → 78 张亲手抽牌 → 排阵解读；牌面 SVG 参考韦特塔罗）=====
   let tarotSpreadKey = 'time';
@@ -1975,6 +2328,17 @@
     showTarotPhase();
     renderPositions();
     renderRead();
+    try {
+      store.tarotHistory = store.tarotHistory || [];
+      store.tarotHistory.unshift({
+        ts: Date.now(),
+        question: tarotQuestion || '(未填写问题)',
+        spread: tarotState.spread.name,
+        cards: tarotState.positions.map(p => ({ name: p.card.name, reversed: p.reversed }))
+      });
+      store.tarotHistory = store.tarotHistory.slice(0, 30);
+      saveStore(store);
+    } catch (e) {}
     toast('牌已翻开，看看牌阵想对你说什么 ✨');
   }
   function resetTarot() {
@@ -2046,8 +2410,11 @@
       importAudio = new Audio();
       importAudio.loop = true;
       importAudio.addEventListener('ended', () => setPlayButton(false));
-      importAudio.addEventListener('pause', () => setPlayButton(false));
+      importAudio.addEventListener('pause', () => { setPlayButton(false); if (!(SynthEngine.isPlaying())) SplashMusic.resume(); });
       importAudio.addEventListener('play', () => setPlayButton(true));
+      // 把导入伴奏接入统一混音上下文，使肯定语女声能叠在同一声场、真正融合（不支持 Web Audio 时自动退回直放）
+      const mc = getMixCtx();
+      if (mc) { try { const src = mc.createMediaElementSource(importAudio); const g = mc.createGain(); g.gain.value = 1; src.connect(g); g.connect(mc.destination); } catch (e) {} }
     }
     return importAudio;
   }
@@ -2164,6 +2531,18 @@
       return;
     }
     renderFate(res);
+    try {
+      const note = getFateNote(res, new Date());
+      store.bazi = {
+        date: dateVal,
+        gender: fateGender,
+        dayMaster: GAN[res.dayMaster],
+        dayMasterElement: WU[res.dayMasterElement],
+        strength: res.strength,
+        noteLine: note.line
+      };
+      saveStore(store);
+    } catch (e) {}
     toast('已为你排盘 ✨');
   });
   function renderFate(res) {
@@ -2198,6 +2577,480 @@
       + `<p class="fate-strength">${escapeHtml(note.strengthText)}</p>`
       + `<p class="fate-yong">${escapeHtml(note.yongText)}</p>`;
   }
+
+  // ===== 命理（紫微斗数，本地计算）=====
+  let ziweiGender = '';
+  const ziweiChips = document.getElementById('ziweiGenderChips');
+  if (ziweiChips) {
+    ziweiChips.querySelectorAll('.chip').forEach(c => {
+      c.addEventListener('click', () => {
+        ziweiGender = c.dataset.gender;
+        ziweiChips.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x === c));
+      });
+    });
+  }
+  const ziweiForm = document.getElementById('ziweiForm');
+  if (ziweiForm) {
+    ziweiForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const dateVal = document.getElementById('ziweiDate').value;
+      if (!dateVal) { toast('请先选择出生日期'); return; }
+      const parts = dateVal.split('-').map(Number);
+      const y = parts[0], m = parts[1], d = parts[2];
+      const hourSel = document.getElementById('ziweiHour').value;
+      const hour = hourSel === '' ? null : Number(hourSel);
+      let res;
+      try { res = computeZiwei(y, m, d, hour, ziweiGender); }
+      catch (err) { toast('排盘出错，请检查日期'); return; }
+      renderZiwei(res, dateVal, ziweiGender);
+      try {
+        store.ziweiHistory = store.ziweiHistory || [];
+        store.ziweiHistory.unshift({ date: dateVal, gender: ziweiGender, ming: res.mingZhi, ju: res.juName, stars: res.mingStars.join('、'), at: Date.now() });
+        if (store.ziweiHistory.length > 20) store.ziweiHistory = store.ziweiHistory.slice(0, 20);
+        saveStore(store);
+      } catch (e) {}
+      toast('已为你排出紫微命盘 ✨');
+    });
+  }
+  function renderZiwei(res, dateVal, gender) {
+    const box = document.getElementById('ziweiResult');
+    if (!box) return;
+    box.style.display = 'block';
+
+    // 命宫总论
+    const summary = getZiweiSummary(res);
+    document.getElementById('ziweiSummary').innerHTML = summary.map(t => `<p class="zi-line">${escapeHtml(t)}</p>`).join('');
+
+    // 十二宫盘（4 列 × 3 行，命宫起顺时针）
+    document.getElementById('ziweiBoard').innerHTML = res.houses.map(h => {
+      const stars = h.stars.length
+        ? h.stars.map(s => `<span class="zi-star">${escapeHtml(s.name)}${s.sihua.length ? `<i class="zi-sihua">${s.sihua.join('')}</i>` : ''}</span>`).join('')
+        : '<span class="zi-star zi-empty">—</span>';
+      return `<div class="zi-palace${h.name === '命宫' ? ' zi-ming' : ''}">`
+        + `<div class="zi-palace-head"><span class="zi-palace-name">${escapeHtml(h.name)}</span><span class="zi-palace-zhi">${escapeHtml(h.zhi)}</span></div>`
+        + `<div class="zi-palace-stars">${stars}</div>`
+        + `<div class="zi-palace-desc">${escapeHtml(h.desc)}</div></div>`;
+    }).join('');
+
+    // 四化提示
+    const sh = res.sihua;
+    const shItems = ['禄', '权', '科', '忌'].map(k => {
+      const star = sh[k];
+      const inPalace = res.houses.find(h => h.stars.some(s => s.name === star));
+      return `<span class="zi-sihua-item zi-${k}"><b>${k}</b>${escapeHtml(star)}${inPalace ? `（${escapeHtml(inPalace.name)}）` : ''}</span>`;
+    }).join('');
+    document.getElementById('ziweiSihua').innerHTML = `<div class="zi-sihua-title">本年干四化</div><div class="zi-sihua-row">${shItems}</div>`;
+
+    // 星情图例
+    document.getElementById('ziweiLegend').innerHTML = `<div class="zi-legend-title">十四主星 · 星情</div>`
+      + `<div class="zi-legend-grid">${Object.keys(ZI_STARS).map(s => `<div class="zi-legend-item"><b>${escapeHtml(s)}</b>${escapeHtml(ZI_STARS[s])}</div>`).join('')}</div>`;
+  }
+
+  // ===== 个人主页（我的光屿）=====
+  const AVATARS = ['🌟','🌙','✨','🔮','📿','🌿','🪷','🌸','💫','🕯️','🌊','🍃','☀️','🌈','🦋'];
+  function defaultProfile() { return { name: '旅人', avatar: '🌟', mood: '在这里，慢下来，照见自己。' }; }
+  function profile() { const p = store.profile || defaultProfile(); return { name: p.name || '旅人', avatar: p.avatar || '🌟', mood: p.mood || '在这里，慢下来，照见自己。' }; }
+  function totalChecks() { return store.wishes.reduce((s, w) => s + (w.checks ? Object.keys(w.checks).length : 0), 0); }
+  // 所有打卡过的日期（去重升序）
+  function allCheckDates() {
+    const set = new Set();
+    store.wishes.forEach(w => Object.keys(w.checks || {}).forEach(d => set.add(d)));
+    Object.keys(store.checkedIn || {}).forEach(d => set.add(d));
+    return Array.from(set).sort();
+  }
+  // 连续打卡天数（今天或昨天有打卡才算延续）
+  function streakDays() {
+    const dates = allCheckDates();
+    if (!dates.length) return 0;
+    const today = todayStr();
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const ystr = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+    const last = dates[dates.length - 1];
+    if (last !== today && last !== ystr) return 0;
+    let n = 1, cur = new Date(last + 'T00:00:00');
+    const set = new Set(dates);
+    for (;;) {
+      cur.setDate(cur.getDate() - 1);
+      const k = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+      if (set.has(k)) { n++; } else break;
+    }
+    return n;
+  }
+  function daysSinceJoin() {
+    const t = Date.parse(store.createdAt);
+    if (!t) return 1;
+    return Math.max(1, Math.floor((Date.now() - t) / 86400000) + 1);
+  }
+  function activeScore() { return totalChecks() + store.wishes.length * 2 + store.tarotHistory.length * 3 + store.savedAffirmations.length; }
+  function levelOf(score) {
+    if (score >= 200) return { name: '屿上之光', hint: '你已把光活成了日常' };
+    if (score >= 80) return { name: '聚光者', hint: '光在你手里聚拢成形' };
+    if (score >= 30) return { name: '拾光者', hint: '你正在一点点捡回自己' };
+    if (score >= 8) return { name: '微光', hint: '光已经亮起来了' };
+    return { name: '初见', hint: '欢迎来到光屿' };
+  }
+
+  function renderMine() {
+    const p = profile();
+    const av = document.getElementById('mineAvatar'); if (av) av.textContent = p.avatar;
+    const nm = document.getElementById('mineName'); if (nm) nm.textContent = p.name;
+    const md = document.getElementById('mineMood'); if (md) md.textContent = p.mood;
+    const lv = document.getElementById('mineLevel'); if (lv) { const L = levelOf(activeScore()); lv.textContent = L.name; lv.title = L.hint; }
+    const since = document.getElementById('mineSince');
+    if (since) since.textContent = `加入光屿第 ${daysSinceJoin()} 天 · 连续打卡 ${streakDays()} 天`;
+
+    // 数据看板
+    const stats = [
+      { k: '加入天数', v: daysSinceJoin(), icon: '🗓️' },
+      { k: '连续打卡', v: streakDays(), icon: '🔥' },
+      { k: '心愿', v: store.wishes.length, icon: '🌙' },
+      { k: '累计打卡', v: totalChecks(), icon: '✅' },
+      { k: '收藏肯定语', v: store.savedAffirmations.length, icon: '💗' },
+      { k: '塔罗占卜', v: store.tarotHistory.length, icon: '🔮' },
+      { k: '紫微命盘', v: store.ziweiHistory.length, icon: '🪐' }
+    ];
+    const statsEl = document.getElementById('mineStats');
+    if (statsEl) statsEl.innerHTML = stats.map(s => `<div class="mine-stat"><div class="mine-stat-v">${s.v}</div><div class="mine-stat-k">${s.icon} ${s.k}</div></div>`).join('');
+
+    // 命理速览
+    const baziBox = document.getElementById('mineBazi');
+    if (baziBox) {
+      if (store.bazi) {
+        baziBox.innerHTML = `<div class="mine-bazi-row"><span>日主</span><b>${escapeHtml(store.bazi.dayMaster)}（五行属${escapeHtml(store.bazi.dayMasterElement)}）</b></div>`
+          + `<div class="mine-bazi-row"><span>身强身弱</span><b>${escapeHtml(store.bazi.strength)}</b></div>`
+          + (store.bazi.noteLine ? `<p class="mine-bazi-note">${escapeHtml(store.bazi.noteLine)}</p>` : '')
+          + `<button class="btn btn-ghost btn-sm" type="button" data-nav="destiny">重排我的八字</button>`;
+      } else {
+        baziBox.innerHTML = `<p class="upload-hint">还没有排过八字。去「命理」输入出生信息，这里会显示你的命理画像。</p><button class="btn btn-ghost btn-sm" type="button" data-nav="destiny">去排盘</button>`;
+      }
+    }
+    const sc = document.getElementById('mineShareCard');
+    if (sc) { sc.style.display = 'none'; sc.innerHTML = ''; }
+    renderMineArchive(currentArc);
+  }
+
+  let currentArc = 'wishes';
+  function renderMineArchive(type) {
+    currentArc = type;
+    const box = document.getElementById('mineArchive');
+    if (!box) return;
+    if (type === 'wishes') {
+      if (!store.wishes.length) { box.innerHTML = '<div class="empty-hint">还没有愿望，去「许愿」种下第一个心愿 🌱</div>'; return; }
+      box.innerHTML = store.wishes.map(w => {
+        const n = Object.keys(w.checks || {}).length;
+        return `<div class="mine-arc-item"><div class="mine-arc-top"><span class="mine-arc-cat">${escapeHtml(w.cat || '心愿')}</span><span class="mine-arc-sub">已打卡 ${n} 天</span></div><div class="mine-arc-text">${escapeHtml(w.text)}</div></div>`;
+      }).join('');
+    } else if (type === 'affirm') {
+      if (!store.savedAffirmations.length) { box.innerHTML = '<div class="empty-hint">还没有收藏的肯定语，在首页点「收藏」即可保存 💗</div>'; return; }
+      box.innerHTML = store.savedAffirmations.map(t => `<div class="mine-arc-item mine-arc-text-only">${escapeHtml(t)}</div>`).join('');
+    } else {
+      if (!store.tarotHistory.length) { box.innerHTML = '<div class="empty-hint">还没有塔罗记录，去「塔罗」抽一卦 🔮</div>'; return; }
+      box.innerHTML = store.tarotHistory.map(r => {
+        const d = new Date(r.ts);
+        const ds = `${d.getMonth() + 1}月${d.getDate()}日`;
+        const cards = (r.cards || []).map(c => `${escapeHtml(c.name)}${c.reversed ? '(逆)' : ''}`).join(' · ');
+        return `<div class="mine-arc-item"><div class="mine-arc-top"><span class="mine-arc-cat">${escapeHtml(r.spread || '牌阵')}</span><span class="mine-arc-sub">${ds}</span></div>`
+          + (r.question ? `<div class="mine-arc-text">${escapeHtml(r.question)}</div>` : '')
+          + `<div class="mine-arc-cards">${cards}</div></div>`;
+      }).join('');
+    }
+  }
+
+  // ---- 资料编辑（内联表单）----
+  let editAvatar = null;
+  function openEdit() {
+    const p = profile();
+    editAvatar = p.avatar;
+    const grid = document.getElementById('mineAvatarGrid');
+    if (grid) {
+      grid.innerHTML = AVATARS.map(a => `<button type="button" class="mine-avatar-opt${a === editAvatar ? ' active' : ''}" data-av="${a}">${a}</button>`).join('');
+    }
+    const ni = document.getElementById('editName'); if (ni) ni.value = p.name;
+    const mi = document.getElementById('editMood'); if (mi) mi.value = p.mood;
+    document.getElementById('mineProfileView').style.display = 'none';
+    document.getElementById('mineProfileEdit').style.display = 'block';
+  }
+  function closeEdit() {
+    document.getElementById('mineProfileEdit').style.display = 'none';
+    document.getElementById('mineProfileView').style.display = 'block';
+  }
+  const editBtn = document.getElementById('btnEditProfile');
+  if (editBtn) editBtn.addEventListener('click', openEdit);
+  const cancelBtn = document.getElementById('btnCancelEdit');
+  if (cancelBtn) cancelBtn.addEventListener('click', closeEdit);
+  const saveBtn = document.getElementById('btnSaveProfile');
+  if (saveBtn) saveBtn.addEventListener('click', () => {
+    const ni = document.getElementById('editName');
+    const mi = document.getElementById('editMood');
+    store.profile = {
+      name: (ni && ni.value.trim()) || '旅人',
+      avatar: editAvatar || '🌟',
+      mood: (mi && mi.value.trim()) || '在这里，慢下来，照见自己。'
+    };
+    saveStore(store); closeEdit(); renderMine(); toast('资料已更新 ✨');
+  });
+  const avGrid = document.getElementById('mineAvatarGrid');
+  if (avGrid) avGrid.addEventListener('click', (e) => {
+    const b = e.target.closest('.mine-avatar-opt'); if (!b) return;
+    editAvatar = b.dataset.av;
+    avGrid.querySelectorAll('.mine-avatar-opt').forEach(x => x.classList.toggle('active', x === b));
+  });
+  // 展示态点头像直接换下一个
+  const avBtn = document.getElementById('mineAvatar');
+  if (avBtn) avBtn.addEventListener('click', () => {
+    const cur = profile();
+    const i = AVATARS.indexOf(cur.avatar);
+    store.profile = { name: cur.name, avatar: AVATARS[(i + 1) % AVATARS.length], mood: cur.mood };
+    saveStore(store); renderMine();
+  });
+
+  // ---- 内容归档子标签 ----
+  const subTabs = document.getElementById('mineSubTabs');
+  if (subTabs) subTabs.addEventListener('click', (e) => {
+    const b = e.target.closest('.mine-subtab'); if (!b) return;
+    subTabs.querySelectorAll('.mine-subtab').forEach(x => x.classList.toggle('active', x === b));
+    renderMineArchive(b.dataset.arc);
+  });
+
+  // ---- 成就分享卡（可出图 + 复制文案）----
+  function shareStats() {
+    return [
+      { icon: '🌙', k: '心愿', v: store.wishes.length },
+      { icon: '✅', k: '打卡', v: totalChecks() },
+      { icon: '🔮', k: '塔罗', v: store.tarotHistory.length },
+      { icon: '💗', k: '收藏', v: store.savedAffirmations.length }
+    ];
+  }
+  function shareText() {
+    const p = profile();
+    return `${p.avatar} ${p.name} 的光屿 · 加入${daysSinceJoin()}天 连续打卡${streakDays()}天 心愿${store.wishes.length} 塔罗${store.tarotHistory.length} —— 光屿·玄学疗愈`;
+  }
+  function drawShareCard() {
+    const W = 750, H = 1060;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    // 背景渐变
+    const grad = g.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#f7f0fa'); grad.addColorStop(0.5, '#efe6f6'); grad.addColorStop(1, '#f9f0e9');
+    g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    // 光晕
+    const orb = (x, y, r, c) => { const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, c); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+    orb(150, 180, 260, 'rgba(201,165,214,0.45)');
+    orb(620, 320, 240, 'rgba(212,180,131,0.35)');
+    orb(400, 900, 300, 'rgba(224,163,176,0.30)');
+    // 星点
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 137.5) % W, y = (i * 219.7) % H, r = (i % 3) * 0.8 + 1;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+    const p = profile();
+    const L = levelOf(activeScore());
+    // 卡片主体
+    g.fillStyle = 'rgba(255,255,255,0.72)';
+    const r = 40, x0 = 60, y0 = 150, w0 = W - 120, h0 = H - 330;
+    g.beginPath();
+    g.moveTo(x0 + r, y0); g.arcTo(x0 + w0, y0, x0 + w0, y0 + h0, r); g.arcTo(x0 + w0, y0 + h0, x0, y0 + h0, r);
+    g.arcTo(x0, y0 + h0, x0, y0, r); g.arcTo(x0, y0, x0 + w0, y0, r); g.closePath(); g.fill();
+    // 头像圆
+    g.fillStyle = 'rgba(255,255,255,0.95)';
+    g.beginPath(); g.arc(W / 2, 300, 92, 0, Math.PI * 2); g.fill();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '96px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    g.fillText(p.avatar, W / 2, 306);
+    // 名字
+    g.fillStyle = '#3a3440';
+    g.font = 'bold 54px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(`${p.name} 的光屿`, W / 2, 450);
+    // 称号
+    g.fillStyle = '#a67bb8';
+    g.font = '28px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(`${L.name} · ${L.hint}`, W / 2, 505);
+    // 加入信息
+    g.fillStyle = '#8a8394';
+    g.font = '26px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(`加入光屿第 ${daysSinceJoin()} 天 · 连续打卡 ${streakDays()} 天`, W / 2, 552);
+    // 数据四宫格
+    const stats = shareStats();
+    const cw = w0 / 4;
+    stats.forEach((s, i) => {
+      const cx = x0 + cw * i + cw / 2;
+      g.fillStyle = '#a67bb8';
+      g.font = 'bold 46px "PingFang SC","Microsoft YaHei",sans-serif';
+      g.fillText(String(s.v), cx, 660);
+      g.fillStyle = '#8a8394';
+      g.font = '24px "PingFang SC","Microsoft YaHei",sans-serif';
+      g.fillText(`${s.icon} ${s.k}`, cx, 712);
+      if (i) {
+        g.strokeStyle = 'rgba(239,233,240,0.9)'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(x0 + cw * i, 620); g.lineTo(x0 + cw * i, 730); g.stroke();
+      }
+    });
+    // 签名 / 寄语
+    g.fillStyle = '#3a3440';
+    g.font = '30px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText('「慢下来，照见自己。」', W / 2, 810);
+    g.fillStyle = '#b6afc0';
+    g.font = '24px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText('愿光落在你身上', W / 2, 856);
+    // 底部
+    g.fillStyle = '#a67bb8';
+    g.font = 'bold 30px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText('✦  光屿 · 玄学疗愈  ✦', W / 2, H - 120);
+    return cv;
+  }
+  const shareBtn = document.getElementById('btnShareCard');
+  if (shareBtn) shareBtn.addEventListener('click', () => {
+    const card = document.getElementById('mineShareCard');
+    if (!card) return;
+    const stats = shareStats();
+    card.style.display = 'block';
+    card.innerHTML = `<div class="share-card">`
+      + `<div class="share-card-top">${escapeHtml(profile().avatar)} ${escapeHtml(profile().name)} 的光屿</div>`
+      + `<div class="share-card-level">${escapeHtml(levelOf(activeScore()).name)} · ${escapeHtml(levelOf(activeScore()).hint)}</div>`
+      + `<div class="share-card-stats">${stats.map(s => `<span>${s.icon} ${s.k} ${s.v}</span>`).join('')}</div>`
+      + `<div class="share-card-line">「慢下来，照见自己。愿光落在你身上。」</div>`
+      + `<div class="share-card-foot">—— 光屿 · 玄学疗愈</div></div>`
+      + `<div class="share-card-btns">`
+      + `<button class="btn btn-primary btn-sm" id="btnSaveShare" type="button">保存为图片</button>`
+      + `<button class="btn btn-ghost btn-sm" id="btnCopyShare" type="button">复制文案</button></div>`
+      + `<canvas id="shareCanvas" style="display:none;"></canvas>`;
+    const cv = drawShareCard();
+    const holder = card.querySelector('#shareCanvas');
+    if (holder) { holder.width = cv.width; holder.height = cv.height; holder.getContext('2d').drawImage(cv, 0, 0); }
+
+    const saveB = card.querySelector('#btnSaveShare');
+    if (saveB) saveB.addEventListener('click', () => {
+      cv.toBlob(blob => {
+        if (!blob) { toast('生成失败，请再试一次'); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `光屿·${profile().name}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        toast('图片已保存到下载 📷');
+      }, 'image/png');
+    });
+    const copyB = card.querySelector('#btnCopyShare');
+    if (copyB) copyB.addEventListener('click', () => {
+      const text = shareText();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => toast('已复制 ✨'), () => toast('复制失败，请长按选择'));
+      } else { toast(text); }
+    });
+    toast('卡片已生成 💌');
+  });
+
+  // ---- 进阶入口（规划中）----
+  const vipBtn = document.getElementById('entryVip');
+  if (vipBtn) vipBtn.addEventListener('click', () => toast('光屿会员正在筹备中，敬请期待 👑'));
+  const mentorBtn = document.getElementById('entryMentor');
+  if (mentorBtn) mentorBtn.addEventListener('click', () => toast('真人疗愈导师正在招募中，敬请期待 🕊️'));
+
+  // ---- 设置：导出 / 清空 ----
+  const exportBtn = document.getElementById('btnExportData');
+  if (exportBtn) exportBtn.addEventListener('click', () => {
+    const data = JSON.stringify(store, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `光屿数据备份-${todayStr()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    toast('数据已导出 📤');
+  });
+  const clearBtn = document.getElementById('btnClearData');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    if (!confirm('确定清空本机全部数据吗？愿望、打卡、收藏、塔罗记录都会删除且不可恢复。')) return;
+    if (!confirm('再次确认：真的要清空吗？')) return;
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+    location.reload();
+  });
+
+  // ===== 开屏 · 主页配乐：直接使用纯音乐《小水鲸》原曲（用户确认直接采用）=====
+  // 进入软件即淡入循环播放；浏览器自动播放策略要求首次有声需用户手势，故经由开屏页「轻触进入」触发。
+  const SplashMusic = (function () {
+    let el = null, started = false, fadeTimer = null;
+    let muted = !!store.muted;
+    const VOL = 0.5;            // 背景音乐音量降至 50%
+    const FADE_IN = 2600;       // 淡入时长(ms)：轻柔开场不突兀
+    const FADE_OUT = 900;       // 淡出时长(ms)：切歌/暂停/静音时平滑收声
+    function ensure() {
+      if (el) return el;
+      el = new Audio('bgm.mp3');
+      el.loop = true;
+      el.preload = 'auto';
+      el.volume = muted ? 0 : VOL;
+      el.playbackRate = 0.7;   // 背景音乐 0.7 倍速，更舒缓
+      return el;
+    }
+    // 平滑改变音量（淡入/淡出），到 0 后可选 done 回调
+    function ramp(target, ms, done) {
+      if (!el) { if (done) done(); return; }
+      clearInterval(fadeTimer); fadeTimer = null;
+      const from = el.volume, t0 = performance.now(), stepMs = 40;
+      fadeTimer = setInterval(() => {
+        const k = Math.min(1, (performance.now() - t0) / ms);
+        el.volume = Math.max(0, Math.min(VOL, from + (target - from) * k));
+        if (k >= 1) { clearInterval(fadeTimer); fadeTimer = null; el.volume = target; if (done) done(); }
+      }, stepMs);
+    }
+    function start() {
+      if (started) return;
+      const a = ensure();
+      started = true;
+      a.volume = muted ? 0 : 0.0001;        // 从极弱起，再淡入到目标音量
+      const p = a.play();
+      if (p && p.catch) p.catch(() => {});
+      if (!muted) ramp(VOL, FADE_IN);
+    }
+    function stop() {
+      if (!started) return; started = false;
+      ramp(0, FADE_OUT, () => { if (el) { try { el.pause(); el.currentTime = 0; } catch (e) {} } });
+    }
+    // 播放定制 Sub / 沉浸模式时先淡出再暂停，避免两路音乐叠加
+    function pause() {
+      if (started && el && !el.paused) ramp(0, FADE_OUT, () => { if (el) try { el.pause(); } catch (e) {} });
+    }
+    function resume() {
+      if (started && el && el.paused) {
+        const p = el.play(); if (p && p.catch) p.catch(() => {});
+        if (!muted) ramp(VOL, FADE_IN);
+      }
+    }
+    function setMute(m) {
+      muted = m;
+      if (!started) return;
+      ramp(m ? 0 : VOL, m ? FADE_OUT : FADE_IN);   // 静音/取消静音均为平滑过渡
+    }
+    return { start, stop, setMute, pause, resume, isMuted: () => muted, isStarted: () => started };
+  })();
+
+  function hideSplash() {
+    const sp = document.getElementById('splash');
+    if (!sp) return;
+    sp.classList.add('hide');
+    setTimeout(() => { sp.style.display = 'none'; }, 700);
+  }
+  function updateAudioIcon() {
+    const b = document.getElementById('btnSplashToggle');
+    if (b) b.textContent = SplashMusic.isMuted() ? '🔇' : '🔊';
+  }
+  const enterBtn = document.getElementById('btnEnter');
+  if (enterBtn) enterBtn.addEventListener('click', () => { SplashMusic.start(); hideSplash(); });
+  const muteEnter = document.getElementById('btnSplashMute');
+  if (muteEnter) muteEnter.addEventListener('click', () => {
+    store.muted = true; saveStore(store); SplashMusic.setMute(true); SplashMusic.start(); updateAudioIcon(); hideSplash();
+  });
+  const audioToggle = document.getElementById('btnSplashToggle');
+  if (audioToggle) audioToggle.addEventListener('click', () => {
+    const m = !SplashMusic.isMuted();
+    SplashMusic.setMute(m); store.muted = m; saveStore(store); updateAudioIcon();
+    if (!SplashMusic.isStarted() && !m) SplashMusic.start();
+    toast(m ? '已静音 🔇' : '疗愈音乐已开启 🔊');
+  });
+  updateAudioIcon();
 
   // ===== 初始化 =====
   computeAffirmation();
