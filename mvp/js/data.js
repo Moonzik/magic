@@ -757,3 +757,454 @@ function getZiweiSummary(res) {
   lines.push('把这张盘当作一面镜子：看见自己的来处与质地，然后更松一点，照自己舒服的方式活。');
   return lines;
 }
+
+// ===================================================================
+// 新增（纯前端扩展）：经文库 / 神谕卡 / 卢恩 / 灵摆 / 西洋星盘 / 数字命理 / 每日一牌
+// ===================================================================
+
+// ---- 经文库：可独立浏览 + 朗读的疗愈短文（按主题分类）----
+const SCRIPTURE_LIB = {
+  '静心': [
+    { title: '让念头像云一样飘过', lines: ['深深地吸一口气，再缓缓地呼出。', '脑海里的念头来来去去，你不必抓住每一朵。', '像看云，不抓云。', '回到呼吸，便回到此刻的安稳。'] },
+    { title: '把肩膀放下来', lines: ['留意一下，你的肩膀是不是还扛着什么。', '轻轻吐气，让它们落回原处。', '世界不必你一个人撑着。', '此刻，你只需要好好待着自己。'] },
+    { title: '给思绪一个暂停键', lines: ['信息太多，心跳也会跟着快。', '关掉一扇窗，世界并不会塌。', '安静不是逃避，是给自己充电。', '停一停，你会更清楚要往哪走。'] }
+  ],
+  '安眠': [
+    { title: '把今天轻轻放下', lines: ['今天发生的一切，都已落幕。', '你已尽力，剩下的交给夜晚。', '像合上一本书，不急着翻下一页。', '闭上眼，让身体沉进柔软的黑暗。'] },
+    { title: '我是安全的', lines: ['门窗关好，灯也调暗了。', '此刻没有必须要解决的事。', '你被这张床、这间屋、这片夜温柔接住。', '我是安全的，可以放心睡去。'] },
+    { title: '慢慢沉入海底', lines: ['想象自己一点点沉入温暖的海。', '白天的喧闹，停在海面之上。', '你越沉越轻，越轻越静。', '在最深最暖的地方，安心休息。'] }
+  ],
+  '疗愈': [
+    { title: '先接住自己', lines: ['难过的时候，别急着好起来。', '先伸出手，轻轻接住那个受伤的自己。', '你会发现，你比想象中更愿意爱自己。', '疗愈不是一阵风，是一点一点把自己拼回原样。'] },
+    { title: '伤口会开花', lines: ['你走过的疼，没有白走。', '它让你更柔软，也更懂得别人。', '裂缝里照进来的光，格外温柔。', '伤口不是终点，是另一朵花要开的地方。'] },
+    { title: '允许自己不完美', lines: ['你不需要时刻发光。', '偶尔灰暗、偶尔疲惫，都是人。', '把自己从"必须优秀"里放出来。', '你本来的样子，就值得被好好对待。'] }
+  ],
+  '增福': [
+    { title: '丰盛本自具足', lines: ['丰盛不是外来的奖赏，是我本自具足的状态。', '我越感恩，越能看见已拥有的好。', '金钱与好运，像河水自然流向松弛的我。', '我值得，也接得住这份丰盛。'] },
+    { title: '好事正在靠近', lines: ['每一个微小的好，都是信号的叠加。', '我保持敞开，不急着定义结果。', '对的方向，会自己浮现。', '我相信，好事正在路上。'] },
+    { title: '被好运眷顾的我', lines: ['我是被生活温柔以待的人。', '随手的小确幸，每天都在发生。', '我把这份幸运，也分给身边的人。', '越分享，福气越流动。'] }
+  ]
+};
+const SCRIPTURE_LIB_CATS = Object.keys(SCRIPTURE_LIB);
+
+// ---- 神谕卡 Oracle：温柔的直觉指引 ----
+const ORACLE_CARDS = [
+  { name: '信任', emoji: '🕊️', msg: '放轻松，你正在被温柔地带领。信任这一步，路会自己展开。' },
+  { name: '臣服', emoji: '🌊', msg: '有些事越用力越紧。试着松手，让水流带你到该去的地方。' },
+  { name: '新生', emoji: '🌱', msg: '一个小小的开始，正在发芽。别小看它，照顾好它。' },
+  { name: '守护', emoji: '🛡️', msg: '你并不孤单，有看不见的力量在护着你。安心前行。' },
+  { name: '疗愈', emoji: '💗', msg: '旧伤口允许被看见、被安抚。你值得被自己好好疼爱。' },
+  { name: '丰盛', emoji: '✨', msg: '宇宙从不吝啬。敞开接收，好事会以你意想不到的方式到来。' },
+  { name: '勇气', emoji: '🔥', msg: '害怕很正常。带着害怕，也往前迈一小步就好。' },
+  { name: '耐心', emoji: '⏳', msg: '好东西需要时间酝酿。此刻的等待，也是成长的一部分。' },
+  { name: '爱自己', emoji: '🌷', msg: '今天，把给别人的温柔，先留一份给自己。' },
+  { name: '释放', emoji: '🍃', msg: '放下那个不再服务你的执念，肩膀会轻很多。' },
+  { name: '灵感', emoji: '💡', msg: '一个念头正在敲门，别急着赶走它，听听看。' },
+  { name: '边界', emoji: '🚧', msg: '说"不"不是冷漠，是保护心里那片干净的花园。' },
+  { name: '感恩', emoji: '🌻', msg: '看看已拥有的，心会先于境遇，先暖起来。' },
+  { name: '真我', emoji: '🌟', msg: '你不需要扮演谁。做回那个松弛、真实的自己，最耀眼。' },
+  { name: '同步', emoji: '🌀', msg: '巧合不是偶然。留意今天反复出现的信号。' },
+  { name: '平静', emoji: '🌕', msg: '外界再闹，你心里可以有一轮不动的月亮。' },
+  { name: '行动', emoji: '🚀', msg: '想了很多，是时候把其中一个，变成第一步。' },
+  { name: '宽恕', emoji: '🕯️', msg: '宽恕别人，其实是放自己一条生路。' },
+  { name: '连接', emoji: '🤝', msg: '你需要的时候，向对的人伸出手，不丢人。' },
+  { name: '希望', emoji: '🌈', msg: '雨后总有光。再撑一会儿，转角就到了。' },
+  { name: '直觉', emoji: '🔮', msg: '第一反应往往最真。别用太多逻辑，盖住它。' },
+  { name: '圆满', emoji: '💫', msg: '你已经做得够好了。允许这一段，漂亮收尾。' },
+  { name: '玩耍', emoji: '🎈', msg: '认真之外，也留点时间，单纯地开心一下。' },
+  { name: '扎根', emoji: '🌳', msg: '向外追逐前，先把自己稳稳地，种回当下。' }
+];
+
+// ---- 卢恩符文 Rune（ Elder Futhark，24 枚，简版含义 + 建议）----
+const RUNES = [
+  { name: 'Fehu _fe', glyph: 'ᚠ', meaning: '财富与丰饶', advice: '你种下的正在结果，安心接收这份丰盛。' },
+  { name: 'Uruz _ur', glyph: 'ᚢ', meaning: '原始力量', advice: '你比想的更有力气，先把这股劲用对地方。' },
+  { name: 'Thurisaz _th', glyph: 'ᚦ', meaning: '荆棘与界限', advice: '有些门不该进。先看清，再决定是否推开。' },
+  { name: 'Ansuz _ans', glyph: 'ᚨ', meaning: '讯息与灵感', advice: '今天会有话想对你说，静下来听。' },
+  { name: 'Raidho _raid', glyph: 'ᚱ', meaning: '旅程与节奏', advice: '每一步都算数，按自己的步调走。' },
+  { name: 'Kenaz _k', glyph: 'ᚲ', meaning: '火把与开窍', advice: '迷处亮起一盏灯，看清你真正想要的。' },
+  { name: 'Gebo _g', glyph: 'ᚷ', meaning: '礼物与交换', advice: '给予与接收是流动的，别只守着不松手。' },
+  { name: 'Wunjo _w', glyph: 'ᚹ', meaning: '喜悦与圆满', advice: '小小的快乐值得被认真享受，别匆匆略过。' },
+  { name: 'Hagalaz _h', glyph: 'ᚺ', meaning: '破冰与转折', advice: '旧结构在碎，是为了腾出新的位置。' },
+  { name: 'Nauthiz _n', glyph: 'ᚾ', meaning: '匮乏与必需', advice: '缺的那块，逼你学会珍惜已有的。' },
+  { name: 'Isa _i', glyph: 'ᛁ', meaning: '静止与冰封', advice: '此刻宜守不宜攻，停一停也很好。' },
+  { name: 'Jera _j', glyph: 'ᛃ', meaning: '年轮与收成', advice: '耐心等季节，该来的会在对的时候到。' },
+  { name: 'Eihwaz _ei', glyph: 'ᛇ', meaning: '世界树与韧性', advice: '连接天地之间，你比困境更长久。' },
+  { name: 'Perthro _p', glyph: 'ᛈ', meaning: '神秘与命运', advice: '有些答案藏在未知里，别急着翻开。' },
+  { name: 'Algiz _al', glyph: 'ᛉ', meaning: '保护与守护', advice: '你被更高的善意护着，安心。' },
+  { name: 'Sowilo _s', glyph: 'ᛋ', meaning: '太阳与胜利', advice: '阴霾散去，光会回来，跟着它走。' },
+  { name: 'Tiwaz _t', glyph: 'ᛏ', meaning: '正义与勇气', advice: '为对的事站出来，你内心有把尺。' },
+  { name: 'Berkano _b', glyph: 'ᛒ', meaning: '生长与新生', advice: '一个想法、一段关系，正在悄悄长大。' },
+  { name: 'Ehwaz _e', glyph: 'ᛖ', meaning: '移动与伙伴', advice: '结伴而行，路会走得更顺更远。' },
+  { name: 'Mannaz _m', glyph: 'ᛗ', meaning: '自我与他人', advice: '在关系这面镜子前，照见真实的自己。' },
+  { name: 'Laguz _l', glyph: 'ᛚ', meaning: '水流与直觉', advice: '别硬撑，顺着感觉，像水一样绕行。' },
+  { name: 'Ingwaz _ing', glyph: 'ᛜ', meaning: '内收与孕育', advice: '先在自己的地里攒能量，再向外发。' },
+  { name: 'Dagaz _d', glyph: 'ᛞ', meaning: '黎明与破晓', advice: '最暗之后就是亮，转折就在眼前。' },
+  { name: 'Othala _o', glyph: 'ᛟ', meaning: '根源与传承', advice: '你从何处来，会给你往前走的底气。' }
+];
+
+// ---- 灵摆 Pendulum：是 / 否 / 再等等 ----
+const PENDULUM_ANSWERS = {
+  yes: [
+    '摆向了你心里早已知道的那个"是"。跟随它。',
+    '能量是顺的。这件事，可以放心往前。',
+    '答案偏"是"——你本就倾向它，只是想要一份确认。'
+  ],
+  no: [
+    '摆停在了"否"。不必勉强，先放下这一种可能。',
+    '能量不太顺，这件事或许还不是时候。',
+    '答案偏"否"——把力气留给更对的方向。'
+  ],
+  maybe: [
+    '摆得不太确定，像在说"再等等看"。',
+    '现在下结论还早，先让事情多沉淀一阵。',
+    '信号模糊，不如先问自己：如果答案揭晓，你希望是什么？'
+  ]
+};
+
+// ---- 西洋星座 Western Astrology（太阳星座趣味版，按生日推算）----
+// 每个星座记录"起始月/日"，getSunSign 按日期落点判断
+const WESTERN_SIGNS = [
+  { key: 'aqu', name: '水瓶座', sym: '♒', el: '风', start: [1, 20], trait: '独立、自由、点子多', reading: '你像风一样不爱被框住，脑子里常冒出别人想不到的角度。疗愈你的，是保留那份"不一样"。' },
+  { key: 'pis', name: '双鱼座', sym: '♓', el: '水', start: [2, 19], trait: '温柔、共情、爱幻想', reading: '你心软也心大，容易替别人装太多情绪。记得先把自己安顿好，再去爱世界。' },
+  { key: 'ari', name: '白羊座', sym: '♈', el: '火', start: [3, 21], trait: '直接、热情、行动派', reading: '你一动起来就发光，怕的是闷着内耗。把冲劲用在热爱的事上，最疗愈。' },
+  { key: 'tau', name: '金牛座', sym: '♉', el: '土', start: [4, 20], trait: '安稳、踏实、重感受', reading: '你需要确定的、可触的安稳。慢一点没关系，把生活过得有质感，你就安心。' },
+  { key: 'gem', name: '双子座', sym: '♊', el: '风', start: [5, 21], trait: '好奇、善变、爱交流', reading: '你脑子转得快，兴趣也散得快。找个能一起聊、一起玩的人，孤独就少了。' },
+  { key: 'can', name: '巨蟹座', sym: '♋', el: '水', start: [6, 22], trait: '顾家、敏感、念旧', reading: '你把安全感看得最重。先把自己那个"家"照顾暖，外面的风浪就小了。' },
+  { key: 'leo', name: '狮子座', sym: '♌', el: '火', start: [7, 23], trait: '大方、要光、重认可', reading: '你需要被看见、被喜欢。大大方方展现自己，也别把价值全押在别人掌声上。' },
+  { key: 'vir', name: '处女座', sym: '♍', el: '土', start: [8, 23], trait: '细致、求真、会操心', reading: '你对自己和 world 都高标准，容易累。允许"足够好"也是一种完成。' },
+  { key: 'lib', name: '天秤座', sym: '♎', el: '风', start: [9, 23], trait: '和谐、审美、怕冲突', reading: '你总在找平衡，有时为了和气委屈自己。温和地表达"我也要"，很重要。' },
+  { key: 'sco', name: '天蝎座', sym: '♏', el: '水', start: [10, 23], trait: '深沉、专一、洞察', reading: '你爱得深也藏得深。把信任慢慢给值得的人，别把门全锁上。' },
+  { key: 'sag', name: '射手座', sym: '♐', el: '火', start: [11, 22], trait: '自由、乐观、爱远方', reading: '你需要空间和盼头，被拴住就蔫。给生活留点"去看看"的余地。' },
+  { key: 'cap', name: '摩羯座', sym: '♑', el: '土', start: [12, 22], trait: '负责、踏实、慢热', reading: '你扛得多、想得远。记得把"对自己好"也列进待办，别只赶路。' }
+];
+function getSunSign(m, d) {
+  // 按起始日期升序（水瓶1/20 … 射手11/22、摩羯12/22）遍历，取「最后一个已开始的星座」；
+  // 未匹配到任何起点说明在 1/20 之前，属于摩羯尾部。
+  const order = ['aqu', 'pis', 'ari', 'tau', 'gem', 'can', 'leo', 'vir', 'lib', 'sco', 'sag', 'cap'];
+  let found = null;
+  for (let i = 0; i < order.length; i++) {
+    const s = WESTERN_SIGNS.find(x => x.key === order[i]);
+    if ((m > s.start[0]) || (m === s.start[0] && d >= s.start[1])) found = s;
+  }
+  return found || WESTERN_SIGNS.find(x => x.key === 'cap');
+}
+// 元素合盘：风/火 相生，水/土 相生；同元素稳，跨组需磨合
+const SYNASTRY = {
+  '风-风': '两个爱聊的人，话题永远不缺，越聊越近。',
+  '风-火': '一个给点子一个给行动，火花四溅，挺带劲。',
+  '风-水': '一个理性飘一个情绪深，多些耐心去懂对方的语言。',
+  '风-土': '一个天马行空一个落地务实，互补但需互相翻译。',
+  '火-火': '都很直接热烈，燃得快也易撞，记得留点冷却空间。',
+  '火-水': '一个往外烧一个往里沉，温度差大，慢一点焐热。',
+  '火-土': '一个冲一个稳，土能接住火，是不错的落地组合。',
+  '水-水': '都敏感念旧，懂彼此的情绪，但要小心一起沉下去。',
+  '水-土': '一个柔软一个踏实，土给水的安稳，水给土的滋润。',
+  '土-土': '都务实靠谱，节奏舒服，就是偶尔少点惊喜。'
+};
+
+// ===== 西洋占星 · 本命盘排盘（趣味参考，非专业占星依据）=====
+// 十行星位置：J2000 轨道要素 + 开普勒方程求解，地心黄经精度约 1′~10′（落座足够）。
+// 宫位采用等宫制（Equal House）：上升为第 1 宫起点，每宫 30°。
+// 上升/天顶依赖出生地与出生时间，故需这两项；时间为本地近似。
+const CITY_DISTRICTS = [
+  { name: '北京市', lat: 39.90, lon: 116.41, districts: [
+    { n: '东城区', lat: 39.92, lon: 116.42 }, { n: '西城区', lat: 39.91, lon: 116.37 },
+    { n: '朝阳区', lat: 39.92, lon: 116.44 }, { n: '海淀区', lat: 39.96, lon: 116.30 },
+    { n: '丰台区', lat: 39.86, lon: 116.29 }, { n: '石景山区', lat: 39.91, lon: 116.22 },
+    { n: '通州区', lat: 39.91, lon: 116.66 }, { n: '昌平区', lat: 40.22, lon: 116.23 },
+    { n: '大兴区', lat: 39.79, lon: 116.34 }, { n: '顺义区', lat: 40.13, lon: 116.65 },
+    { n: '房山区', lat: 39.75, lon: 116.14 }, { n: '门头沟区', lat: 39.94, lon: 116.10 }] },
+  { name: '上海市', lat: 31.23, lon: 121.47, districts: [
+    { n: '黄浦区', lat: 31.23, lon: 121.49 }, { n: '徐汇区', lat: 31.19, lon: 121.44 },
+    { n: '长宁区', lat: 31.22, lon: 121.42 }, { n: '静安区', lat: 31.23, lon: 121.46 },
+    { n: '普陀区', lat: 31.25, lon: 121.40 }, { n: '虹口区', lat: 31.27, lon: 121.49 },
+    { n: '杨浦区', lat: 31.26, lon: 121.52 }, { n: '闵行区', lat: 31.11, lon: 121.38 },
+    { n: '宝山区', lat: 31.40, lon: 121.49 }, { n: '嘉定区', lat: 31.38, lon: 121.25 },
+    { n: '浦东新区', lat: 31.22, lon: 121.54 }, { n: '松江区', lat: 31.03, lon: 121.23 },
+    { n: '青浦区', lat: 31.15, lon: 121.12 }, { n: '奉贤区', lat: 30.92, lon: 121.47 },
+    { n: '金山区', lat: 30.74, lon: 121.34 }] },
+  { name: '广州市', lat: 23.13, lon: 113.26, districts: [
+    { n: '越秀区', lat: 23.13, lon: 113.27 }, { n: '海珠区', lat: 23.08, lon: 113.32 },
+    { n: '荔湾区', lat: 23.12, lon: 113.24 }, { n: '天河区', lat: 23.13, lon: 113.36 },
+    { n: '白云区', lat: 23.26, lon: 113.27 }, { n: '黄埔区', lat: 23.13, lon: 113.48 },
+    { n: '番禺区', lat: 22.94, lon: 113.38 }, { n: '花都区', lat: 23.40, lon: 113.21 },
+    { n: '南沙区', lat: 22.80, lon: 113.53 }, { n: '增城区', lat: 23.29, lon: 113.81 },
+    { n: '从化区', lat: 23.55, lon: 113.62 }] },
+  { name: '深圳市', lat: 22.54, lon: 114.06, districts: [
+    { n: '福田区', lat: 22.54, lon: 114.06 }, { n: '罗湖区', lat: 22.55, lon: 114.13 },
+    { n: '南山区', lat: 22.53, lon: 113.93 }, { n: '宝安区', lat: 22.65, lon: 113.88 },
+    { n: '龙岗区', lat: 22.72, lon: 114.25 }, { n: '盐田区', lat: 22.56, lon: 114.24 },
+    { n: '龙华区', lat: 22.65, lon: 114.03 }, { n: '坪山区', lat: 22.69, lon: 114.35 },
+    { n: '光明区', lat: 22.75, lon: 113.90 }, { n: '大鹏新区', lat: 22.63, lon: 114.48 }] },
+  { name: '天津市', lat: 39.13, lon: 117.20, districts: [
+    { n: '和平区', lat: 39.12, lon: 117.20 }, { n: '河东区', lat: 39.13, lon: 117.24 },
+    { n: '河西区', lat: 39.11, lon: 117.22 }, { n: '南开区', lat: 39.14, lon: 117.15 },
+    { n: '河北区', lat: 39.15, lon: 117.20 }, { n: '红桥区', lat: 39.17, lon: 117.16 },
+    { n: '滨海新区', lat: 39.03, lon: 117.65 }, { n: '东丽区', lat: 39.09, lon: 117.31 },
+    { n: '西青区', lat: 39.14, lon: 117.01 }, { n: '津南区', lat: 39.01, lon: 117.38 },
+    { n: '北辰区', lat: 39.22, lon: 117.13 }, { n: '武清区', lat: 39.63, lon: 117.04 }] },
+  { name: '重庆市', lat: 29.56, lon: 106.55, districts: [
+    { n: '渝中区', lat: 29.56, lon: 106.55 }, { n: '江北区', lat: 29.58, lon: 106.58 },
+    { n: '南岸区', lat: 29.53, lon: 106.65 }, { n: '九龙坡区', lat: 29.50, lon: 106.51 },
+    { n: '沙坪坝区', lat: 29.55, lon: 106.46 }, { n: '渝北区', lat: 29.72, lon: 106.63 },
+    { n: '巴南区', lat: 29.38, lon: 106.55 }, { n: '北碚区', lat: 29.83, lon: 106.40 },
+    { n: '两江新区', lat: 29.68, lon: 106.55 }, { n: '万州区', lat: 30.81, lon: 108.41 }] },
+  { name: '成都市', lat: 30.66, lon: 104.07, districts: [
+    { n: '锦江区', lat: 30.66, lon: 104.08 }, { n: '青羊区', lat: 30.67, lon: 104.06 },
+    { n: '金牛区', lat: 30.70, lon: 104.05 }, { n: '武侯区', lat: 30.64, lon: 104.05 },
+    { n: '成华区', lat: 30.66, lon: 104.12 }, { n: '高新区', lat: 30.55, lon: 104.07 },
+    { n: '龙泉驿区', lat: 30.56, lon: 104.27 }, { n: '青白江区', lat: 30.88, lon: 104.25 },
+    { n: '新都区', lat: 30.82, lon: 104.16 }, { n: '温江区', lat: 30.70, lon: 103.85 },
+    { n: '双流区', lat: 30.57, lon: 103.92 }, { n: '郫都区', lat: 30.80, lon: 103.89 }] },
+  { name: '杭州市', lat: 30.27, lon: 120.15, districts: [
+    { n: '上城区', lat: 30.24, lon: 120.17 }, { n: '拱墅区', lat: 30.32, lon: 120.15 },
+    { n: '西湖区', lat: 30.26, lon: 120.13 }, { n: '滨江区', lat: 30.21, lon: 120.21 },
+    { n: '萧山区', lat: 30.19, lon: 120.26 }, { n: '余杭区', lat: 30.42, lon: 120.30 },
+    { n: '临平区', lat: 30.42, lon: 120.30 }, { n: '钱塘区', lat: 30.32, lon: 120.50 },
+    { n: '富阳区', lat: 30.05, lon: 119.95 }, { n: '临安区', lat: 30.23, lon: 119.72 }] },
+  { name: '武汉市', lat: 30.59, lon: 114.30, districts: [
+    { n: '江岸区', lat: 30.60, lon: 114.30 }, { n: '江汉区', lat: 30.58, lon: 114.27 },
+    { n: '硚口区', lat: 30.57, lon: 114.23 }, { n: '汉阳区', lat: 30.55, lon: 114.22 },
+    { n: '武昌区', lat: 30.55, lon: 114.32 }, { n: '青山区', lat: 30.63, lon: 114.40 },
+    { n: '洪山区', lat: 30.50, lon: 114.39 }, { n: '东西湖区', lat: 30.62, lon: 114.13 },
+    { n: '蔡甸区', lat: 30.58, lon: 114.03 }, { n: '江夏区', lat: 30.37, lon: 114.32 },
+    { n: '黄陂区', lat: 30.87, lon: 114.37 }] },
+  { name: '西安市', lat: 34.34, lon: 108.94, districts: [
+    { n: '新城区', lat: 34.27, lon: 108.95 }, { n: '碑林区', lat: 34.25, lon: 108.95 },
+    { n: '莲湖区', lat: 34.27, lon: 108.92 }, { n: '雁塔区', lat: 34.20, lon: 108.92 },
+    { n: '未央区', lat: 34.32, lon: 108.90 }, { n: '灞桥区', lat: 34.28, lon: 109.10 },
+    { n: '长安区', lat: 34.16, lon: 108.94 }, { n: '阎良区', lat: 34.66, lon: 109.23 },
+    { n: '临潼区', lat: 34.37, lon: 109.21 }, { n: '高陵区', lat: 34.54, lon: 109.09 }] },
+  { name: '南京市', lat: 32.06, lon: 118.80, districts: [
+    { n: '玄武区', lat: 32.06, lon: 118.80 }, { n: '秦淮区', lat: 32.03, lon: 118.79 },
+    { n: '建邺区', lat: 32.01, lon: 118.73 }, { n: '鼓楼区', lat: 32.06, lon: 118.77 },
+    { n: '浦口区', lat: 32.06, lon: 118.63 }, { n: '栖霞区', lat: 32.10, lon: 118.90 },
+    { n: '雨花台区', lat: 31.99, lon: 118.78 }, { n: '江宁区', lat: 31.95, lon: 118.84 },
+    { n: '六合区', lat: 32.35, lon: 118.85 }, { n: '溧水区', lat: 31.65, lon: 119.03 }] },
+  { name: '苏州市', lat: 31.30, lon: 120.62, districts: [
+    { n: '姑苏区', lat: 31.30, lon: 120.62 }, { n: '虎丘区', lat: 31.30, lon: 120.58 },
+    { n: '吴中区', lat: 31.20, lon: 120.63 }, { n: '相城区', lat: 31.39, lon: 120.64 },
+    { n: '吴江区', lat: 31.16, lon: 120.64 }, { n: '工业园区', lat: 31.32, lon: 120.72 },
+    { n: '常熟市', lat: 31.65, lon: 120.75 }, { n: '昆山市', lat: 31.39, lon: 120.98 }] },
+  { name: '长沙市', lat: 28.20, lon: 113.02, districts: [
+    { n: '芙蓉区', lat: 28.20, lon: 113.02 }, { n: '天心区', lat: 28.12, lon: 112.99 },
+    { n: '岳麓区', lat: 28.20, lon: 112.94 }, { n: '开福区', lat: 28.24, lon: 112.99 },
+    { n: '雨花区', lat: 28.13, lon: 113.03 }, { n: '望城区', lat: 28.36, lon: 112.82 },
+    { n: '长沙县', lat: 28.24, lon: 113.09 }, { n: '浏阳市', lat: 28.15, lon: 113.63 }] },
+  { name: '郑州市', lat: 34.75, lon: 113.63, districts: [
+    { n: '中原区', lat: 34.75, lon: 113.61 }, { n: '二七区', lat: 34.72, lon: 113.64 },
+    { n: '管城区', lat: 34.74, lon: 113.68 }, { n: '金水区', lat: 34.79, lon: 113.67 },
+    { n: '上街区', lat: 34.81, lon: 113.29 }, { n: '惠济区', lat: 34.87, lon: 113.60 },
+    { n: '中牟县', lat: 34.73, lon: 114.01 }, { n: '新郑市', lat: 34.41, lon: 113.74 }] },
+  { name: '青岛市', lat: 36.07, lon: 120.38, districts: [
+    { n: '市南区', lat: 36.07, lon: 120.38 }, { n: '市北区', lat: 36.09, lon: 120.37 },
+    { n: '李沧区', lat: 36.16, lon: 120.42 }, { n: '崂山区', lat: 36.11, lon: 120.47 },
+    { n: '城阳区', lat: 36.30, lon: 120.39 }, { n: '黄岛区', lat: 35.97, lon: 120.19 },
+    { n: '即墨区', lat: 36.39, lon: 120.45 }] },
+  { name: '沈阳市', lat: 41.80, lon: 123.43, districts: [
+    { n: '和平区', lat: 41.80, lon: 123.43 }, { n: '沈河区', lat: 41.80, lon: 123.46 },
+    { n: '大东区', lat: 41.82, lon: 123.49 }, { n: '皇姑区', lat: 41.85, lon: 123.42 },
+    { n: '铁西区', lat: 41.80, lon: 123.35 }, { n: '浑南区', lat: 41.75, lon: 123.48 },
+    { n: '于洪区', lat: 41.80, lon: 123.28 }] },
+  { name: '中国香港', lat: 22.32, lon: 114.17, districts: [
+    { n: '中西区', lat: 22.28, lon: 114.15 }, { n: '湾仔区', lat: 22.28, lon: 114.17 },
+    { n: '东区', lat: 22.28, lon: 114.22 }, { n: '南区', lat: 22.25, lon: 114.16 },
+    { n: '油尖旺区', lat: 22.31, lon: 114.17 }, { n: '深水埗区', lat: 22.33, lon: 114.16 },
+    { n: '九龙城区', lat: 22.33, lon: 114.19 }, { n: '黄大仙区', lat: 22.34, lon: 114.20 },
+    { n: '观塘区', lat: 22.31, lon: 114.23 }, { n: '荃湾区', lat: 22.37, lon: 114.11 },
+    { n: '屯门区', lat: 22.39, lon: 113.98 }, { n: '元朗区', lat: 22.44, lon: 114.03 },
+    { n: '北区', lat: 22.50, lon: 114.13 }, { n: '大埔区', lat: 22.45, lon: 114.17 },
+    { n: '西贡区', lat: 22.38, lon: 114.27 }, { n: '沙田区', lat: 22.39, lon: 114.19 },
+    { n: '葵青区', lat: 22.36, lon: 114.13 }, { n: '离岛区', lat: 22.25, lon: 113.95 }] },
+  { name: '中国台北', lat: 25.03, lon: 121.56, districts: [
+    { n: '中正区', lat: 25.03, lon: 121.52 }, { n: '大同区', lat: 25.06, lon: 121.51 },
+    { n: '中山区', lat: 25.07, lon: 121.53 }, { n: '松山区', lat: 25.05, lon: 121.56 },
+    { n: '大安区', lat: 25.03, lon: 121.54 }, { n: '万华区', lat: 25.04, lon: 121.50 },
+    { n: '信义区', lat: 25.03, lon: 121.57 }, { n: '士林区', lat: 25.09, lon: 121.53 },
+    { n: '北投区', lat: 25.13, lon: 121.50 }, { n: '内湖区', lat: 25.08, lon: 121.59 },
+    { n: '南港区', lat: 25.05, lon: 121.61 }, { n: '文山区', lat: 24.99, lon: 121.54 }] }
+];
+const SIGN_TROPICAL = ['ari', 'tau', 'gem', 'can', 'leo', 'vir', 'lib', 'sco', 'sag', 'cap', 'aqu', 'pis'];
+function _signFromLon(lon) {
+  const i = ((Math.floor(lon / 30) % 12) + 12) % 12;
+  return WESTERN_SIGNS.find(x => x.key === SIGN_TROPICAL[i]);
+}
+function _degInSign(lon) { return ((lon % 30) + 30) % 30; }
+function _julianDay(y, m, d, hh, mm) {
+  const a = Math.floor((14 - m) / 12);
+  const yy = y + 4800 - a;
+  const mm2 = m + 12 * a - 3;
+  const jdn = d + Math.floor((153 * mm2 + 2) / 5) + 365 * yy + Math.floor(yy / 4) - Math.floor(yy / 100) + Math.floor(yy / 400) - 32045;
+  return jdn + (hh - 12) / 24 + (mm || 0) / 1440;
+}
+// J2000 轨道要素：[值, 每世纪变化率]，角度制
+const PLANET_ELEMENTS = [
+  { key: 'mercury', a: [0.38709927, 0.00000037], e: [0.20563593, 0.00001906], i: [7.00497902, -0.00594749], L: [252.25032350, 149472.67411175], peri: [77.45779628, 0.16047689], node: [48.33076593, -0.12534081] },
+  { key: 'venus',   a: [0.72333566, 0.00000390], e: [0.00677672, -0.00004107], i: [3.39467605, -0.00078890], L: [181.97909950, 58517.81538729], peri: [131.60246718, 0.00268329], node: [76.67984255, -0.27769418] },
+  { key: 'earth',   a: [1.00000261, 0.00000562], e: [0.01671123, -0.00004392], i: [-0.00001531, -0.01294668], L: [100.46457166, 35999.37244981], peri: [102.93768193, 0.32327364], node: [0.0, 0.0] },
+  { key: 'mars',    a: [1.52371034, 0.00001847], e: [0.09339410, 0.00007882], i: [1.84969142, -0.00813131], L: [-4.55343205, 19140.30268499], peri: [-23.94362959, 0.44441088], node: [49.55953891, -0.29257343] },
+  { key: 'jupiter', a: [5.20288700, -0.00011607], e: [0.04838624, -0.00013253], i: [1.30439695, -0.00183714], L: [34.39644051, 3034.74612775], peri: [14.72847983, 0.21252668], node: [100.47390909, 0.20469106] },
+  { key: 'saturn',  a: [9.53667594, -0.00125060], e: [0.05386179, -0.00050991], i: [2.48599187, 0.00193609], L: [49.95424423, 1222.49362201], peri: [92.59887831, -0.41897216], node: [113.66242448, -0.28867794] },
+  { key: 'uranus',  a: [19.18916464, -0.00196176], e: [0.04725744, -0.00004397], i: [0.77263783, -0.00242939], L: [313.23810451, 428.48202785], peri: [170.95427630, 0.40805281], node: [74.01692503, 0.04240589] },
+  { key: 'neptune', a: [30.06992276, 0.00026291], e: [0.00859048, 0.00005105], i: [1.77004347, 0.00035372], L: [-55.12002969, 218.45945325], peri: [44.96476227, -0.32241464], node: [131.78422574, -0.00508664] },
+  { key: 'pluto',   a: [39.48211675, -0.00031596], e: [0.24882730, 0.00005170], i: [17.14001206, 0.00004818], L: [238.92903833, 145.20780515], peri: [224.06891629, -0.04062942], node: [110.30393684, -0.01183482] }
+];
+const PLANET_META = [
+  { key: 'sun', name: '太阳', glyph: '☉' }, { key: 'moon', name: '月亮', glyph: '☽' },
+  { key: 'mercury', name: '水星', glyph: '☿' }, { key: 'venus', name: '金星', glyph: '♀' },
+  { key: 'mars', name: '火星', glyph: '♂' }, { key: 'jupiter', name: '木星', glyph: '♃' },
+  { key: 'saturn', name: '土星', glyph: '♄' }, { key: 'uranus', name: '天王星', glyph: '♅' },
+  { key: 'neptune', name: '海王星', glyph: '♆' }, { key: 'pluto', name: '冥王星', glyph: '♇' }
+];
+const ASPECTS = [
+  { key: 'conj', name: '合相', angle: 0, orb: 8, color: '#e0a33e', nature: '强化' },
+  { key: 'sextile', name: '六分相', angle: 60, orb: 6, color: '#4a90d9', nature: '机会' },
+  { key: 'square', name: '四分相', angle: 90, orb: 8, color: '#d9534f', nature: '张力' },
+  { key: 'trine', name: '三分相', angle: 120, orb: 8, color: '#3f9e7a', nature: '顺畅' },
+  { key: 'opp', name: '对冲相', angle: 180, orb: 8, color: '#d9534f', nature: '拉扯' }
+];
+const HOUSE_BRIEF = [
+  '自我、外形、给人的第一印象', '金钱、资源、你看重的东西', '沟通、学习、身边的日常',
+  '家庭、根源、内在的安全感', '创作、愉悦、恋爱、被看见', '工作、健康、日常的秩序',
+  '伴侣、合作、与他人的约定', '深层转化、亲密、脆弱与信任', '远方、信念、探索与意义',
+  '事业、公众形象、想成为的样子', '社群、朋友、共同的愿景', '独处、潜意识、放下与疗愈'
+];
+function _keplerE(M, e) {
+  let E = M;
+  for (let k = 0; k < 15; k++) {
+    const d = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    E -= d;
+    if (Math.abs(d) < 1e-11) break;
+  }
+  return E;
+}
+function _helio(el, T) {
+  const a = el.a[0] + el.a[1] * T, e = el.e[0] + el.e[1] * T;
+  const I = (el.i[0] + el.i[1] * T) * Math.PI / 180;
+  const L = el.L[0] + el.L[1] * T;
+  const peri = el.peri[0] + el.peri[1] * T;
+  const node = (el.node[0] + el.node[1] * T) * Math.PI / 180;
+  const w = (peri - el.node[0] - el.node[1] * T) * Math.PI / 180; // 近日点角距
+  let M = ((L - peri) % 360 + 360) % 360; if (M > 180) M -= 360;
+  const E = _keplerE(M * Math.PI / 180, e);
+  const xv = a * (Math.cos(E) - e), yv = a * Math.sqrt(1 - e * e) * Math.sin(E);
+  const cw = Math.cos(w), sw = Math.sin(w), ci = Math.cos(I), si = Math.sin(I);
+  const cn = Math.cos(node), sn = Math.sin(node);
+  return {
+    x: (cw * cn - sw * sn * ci) * xv + (-sw * cn - cw * sn * ci) * yv,
+    y: (cw * sn + sw * cn * ci) * xv + (-sw * sn + cw * cn * ci) * yv,
+    z: (sw * si) * xv + (cw * si) * yv
+  };
+}
+function _planetLons(n) {
+  const T = n / 36525.0;
+  const earthEl = PLANET_ELEMENTS[2];
+  const eh = _helio(earthEl, T);
+  const out = {};
+  out.sun = (((Math.atan2(eh.y, eh.x) * 180 / Math.PI + 180) % 360) + 360) % 360;
+  PLANET_ELEMENTS.forEach(el => {
+    if (el.key === 'earth') return;
+    const p = _helio(el, T);
+    out[el.key] = (((Math.atan2(p.y - eh.y, p.x - eh.x) * 180 / Math.PI) % 360) + 360) % 360;
+  });
+  // 月亮：ELP 低精度展开（精度约 0.1°~0.3°）
+  const Mm = (134.963 + 13.064993 * n) * Math.PI / 180;
+  const Dm = (297.850 + 12.190749 * n) * Math.PI / 180;
+  const ml = 218.316 + 13.176396 * n + 6.289 * Math.sin(Mm)
+    - 1.274 * Math.sin(2 * Dm - Mm) - 0.658 * Math.sin(2 * Dm)
+    - 0.214 * Math.sin(2 * Mm) + 0.110 * Math.sin(Dm);
+  out.moon = ((ml % 360) + 360) % 360;
+  return out;
+}
+function castChart(y, m, d, hh, mm, lat, lon) {
+  const latV = (lat === undefined || lat === null) ? 30 : lat;
+  const lonV = (lon === undefined || lon === null) ? 110 : lon;
+  const utcOff = Math.round(lonV / 15);
+  const jd = _julianDay(y, m, d, (hh || 0) - utcOff, mm || 0);
+  const n = jd - 2451545.0;
+  // 上升 / 天顶
+  const gst = ((280.46061837 + 360.98564736629 * n) % 360 + 360) % 360;
+  const lst = ((gst + lonV) % 360 + 360) % 360;
+  const ramc = lst * Math.PI / 180;
+  const eps = 23.4393 * Math.PI / 180;
+  const phi = latV * Math.PI / 180;
+  const ascLon = ((Math.atan2(Math.cos(ramc), -(Math.sin(ramc) * Math.cos(eps) + Math.tan(phi) * Math.sin(eps))) * 180 / Math.PI) % 360 + 360) % 360;
+  const mcLon = ((Math.atan2(Math.sin(ramc), Math.cos(ramc) * Math.cos(eps)) * 180 / Math.PI) % 360 + 360) % 360;
+  // 行星（含逆行判定：与次日黄经比较）
+  const l1 = _planetLons(n), l2 = _planetLons(n + 1);
+  const planets = PLANET_META.map(meta => {
+    const L = l1[meta.key];
+    let diff = l2[meta.key] - L;
+    if (diff > 180) diff -= 360; if (diff < -180) diff += 360;
+    const rel = ((L - ascLon) % 360 + 360) % 360;
+    return {
+      key: meta.key, name: meta.name, glyph: meta.glyph, lon: L,
+      sign: _signFromLon(L), deg: _degInSign(L),
+      house: Math.floor(rel / 30) + 1, retro: diff < 0
+    };
+  });
+  // 等宫制宫头
+  const houses = [];
+  for (let k = 0; k < 12; k++) houses.push((ascLon + k * 30) % 360);
+  // 相位（行星之间 + 与上升）
+  const bodies = planets.concat([{
+    key: 'asc', name: '上升', glyph: '↑', lon: ascLon,
+    sign: _signFromLon(ascLon), deg: _degInSign(ascLon), house: 1, retro: false
+  }]);
+  const aspects = [];
+  for (let i = 0; i < bodies.length; i++) {
+    for (let j = i + 1; j < bodies.length; j++) {
+      let sep = Math.abs(bodies[i].lon - bodies[j].lon) % 360;
+      if (sep > 180) sep = 360 - sep;
+      ASPECTS.forEach(asp => {
+        const orb = Math.abs(sep - asp.angle);
+        if (orb <= asp.orb) aspects.push({ a: bodies[i], b: bodies[j], type: asp, orb: orb, sep: sep });
+      });
+    }
+  }
+  aspects.sort((x, y) => x.orb - y.orb);
+  const byKey = {}; planets.forEach(p => { byKey[p.key] = p; });
+  return {
+    asc: { lon: ascLon, sign: _signFromLon(ascLon), deg: _degInSign(ascLon) },
+    mc: { lon: mcLon, sign: _signFromLon(mcLon), deg: _degInSign(mcLon) },
+    sun: byKey.sun, moon: byKey.moon,
+    planets: planets, houses: houses, aspects: aspects
+  };
+}
+
+// ---- 数字命理 Life Path（生命数字 1-9 / 11 / 22 / 33）----
+function computeLifePath(y, m, d) {
+  function reduce(n) {
+    while (n > 9 && n !== 11 && n !== 22 && n !== 33) {
+      n = String(n).split('').reduce((a, c) => a + parseInt(c, 10), 0);
+    }
+    return n;
+  }
+  const sum = reduce(y) + reduce(m) + reduce(d);
+  return reduce(sum);
+}
+const LIFE_PATH_MEANINGS = {
+  1: { name: '开拓者', text: '你天生带着"开始"的能量，敢想敢做。疗愈你的，是把主意变成第一步。' },
+  2: { name: '调和者', text: '你 sensitive 也擅长与人相处，是关系的润滑剂。记得别光顾着别人。' },
+  3: { name: '表达者', text: '你有把情绪变成创造的天赋。写、画、说，都是你的出口。' },
+  4: { name: '建造者', text: '你靠谱、能扛，喜欢把事做扎实。别让"必须稳妥"把自己捆太紧。' },
+  5: { name: '自由魂', text: '你爱变化、怕被框。给生活留点未知和新鲜，你就活过来了。' },
+  6: { name: '守护者', text: '你习惯照顾人，是家里的暖。先把这份暖，分一点给自己。' },
+  7: { name: '探索者', text: '你爱想深、爱独处，在安静里找答案。别因想太多，误以为自己孤身一人。' },
+  8: { name: '成就者', text: '你有把事做大的本事，也别把"成功"当成唯一价值。' },
+  9: { name: '慈悲者', text: '你心大、共情强，装着很多人的苦。先把自己填饱，才能一直给。' },
+  11: { name: '灵感使者', text: '你是放大的 2 号，直觉与灵性都强。学着把敏感，当成天赋而非负担。' },
+  22: { name: '大师建造', text: '你是放大的 4 号，能把大梦想落地。别被"必须伟大"压住，一步步来。' },
+  33: { name: '大师疗愈', text: '你是放大的 6 号，天生带着疗愈他人的光。也别忘了，你同样需要被疗愈。' }
+};
+
+// ---- 每日一牌（按当天日期种子，从 78 张稳定取一张）----
+function getDailyTarot(dateStr) {
+  const seed = seedFromDate(dateStr || todayStr());
+  const idx = seed % TAROT_DECK.length;
+  const card = TAROT_DECK[idx];
+  const reversed = (seed >> 7) % 2 === 1;   // 约一半概率逆位，当天固定
+  return { card, reversed, meaning: reversed ? card.reversed : card.upright };
+}
+

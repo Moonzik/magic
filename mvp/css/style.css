@@ -717,6 +717,13 @@ body { padding-bottom: 80px; }
 }
 .subtab.active { background: var(--brand-soft); color: var(--brand-deep); font-weight: 600; }
 
+/* 窄屏（手机）下子导航改为横向滚动，避免 5 个占卜子项被挤扁/截断 */
+@media (max-width: 480px) {
+  .subtabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin-bottom: 14px; padding-bottom: 2px; }
+  .subtabs::-webkit-scrollbar { display: none; }
+  .subtab { flex: 0 0 auto; white-space: nowrap; padding: 10px 14px; }
+}
+
 /* 归档列表 */
 .mine-arc-item {
   background: var(--bg);
@@ -901,3 +908,112 @@ body { padding-bottom: 80px; }
 .zi-legend-item { font-size: 11.5px; color: var(--ink-faint); line-height: 1.6; }
 .zi-legend-item b { color: var(--ink); margin-right: 4px; }
 .ziwei-disclaimer { font-size: 11px; color: var(--ink-faint); margin-top: 12px; line-height: 1.6; }
+
+/* ===== 新增板块样式：每日一牌 / 经文库 / 神谕卡 / 卢恩 / 灵摆 / 星盘 / 数字命理 / 分享卡 ===== */
+/* 每日一牌 */
+.daily-card-face { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 4px 4px; }
+.daily-sym { font-size: 56px; line-height: 1; margin-bottom: 8px; }
+.daily-name { font-size: 18px; font-weight: 700; color: var(--brand-deep, #6b5b95); }
+.daily-rev { font-size: 13px; color: var(--ink-faint); font-weight: 500; }
+.daily-meaning { font-size: 14.5px; color: var(--ink-soft); line-height: 1.8; margin-top: 10px; max-width: 92%; }
+.daily-actions, .daily-card .daily-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+
+/* 经文库 */
+.scripture-lib { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+.sl-item { background: linear-gradient(160deg, #fbf7ff, #f3ecf8); border: 1px solid rgba(166,123,184,.18); border-radius: 14px; padding: 12px 14px; }
+.sl-title { font-size: 15px; font-weight: 700; color: var(--brand-deep, #6b5b95); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sl-read { flex: 0 0 auto; }
+.sl-lines { margin-top: 8px; }
+.sl-line { font-size: 14px; color: var(--ink-soft); line-height: 1.85; padding: 2px 0; }
+.sl-line.sr-active { color: var(--accent, #8a7bd8); font-weight: 600; transform: translateX(2px); background: rgba(166,123,184,.08); border-radius: 6px; }
+
+/* 神谕卡 */
+.oracle-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 4px; }
+.oracle-emoji { font-size: 64px; line-height: 1; margin-bottom: 10px; }
+.oracle-name { font-size: 20px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 10px; }
+.oracle-msg { font-size: 15px; color: var(--ink-soft); line-height: 1.9; max-width: 94%; }
+
+/* 卢恩符文 */
+.rune-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 4px; }
+.rune-glyph { font-size: 72px; line-height: 1; color: var(--brand-deep, #6b5b95); margin-bottom: 10px; }
+.rune-name { font-size: 18px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 8px; }
+.rune-meaning { font-size: 15px; color: var(--ink); font-weight: 600; margin-bottom: 6px; }
+.rune-advice { font-size: 14px; color: var(--ink-soft); line-height: 1.85; max-width: 94%; }
+
+/* 灵摆 */
+.pendulum-ans { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 4px; }
+.pend-sym { font-size: 56px; line-height: 1; margin-bottom: 8px; }
+.pend-type { font-size: 22px; font-weight: 800; color: var(--brand-deep, #6b5b95); margin-bottom: 10px; }
+.pend-msg { font-size: 15px; color: var(--ink-soft); line-height: 1.9; max-width: 94%; }
+
+/* 西洋星盘 / 数字命理 结果 */
+.astro-result .astro-sign, .numero-num { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 6px; }
+.astro-sym { font-size: 30px; }
+.astro-el, .astro-trait, .numero-name { font-size: 14px; color: var(--ink-soft); margin-bottom: 4px; }
+.astro-reading, .numero-text { font-size: 14.5px; color: var(--ink-soft); line-height: 1.9; margin-top: 8px; }
+.numero-num { font-size: 22px; margin-bottom: 10px; }
+.numero-big { font-size: 56px; font-weight: 800; color: var(--brand-deep, #6b5b95); line-height: 1; }
+.astro-synastry { margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(166,123,184,.3); }
+.syn-title { font-size: 15px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 8px; text-align: center; }
+.syn-text { font-size: 14px; color: var(--ink-soft); line-height: 1.85; }
+
+/* 历史记录行 */
+.hist-row { font-size: 13px; color: var(--ink-soft); padding: 4px 0; border-bottom: 1px solid rgba(166,123,184,.1); }
+.hist-row:last-child { border-bottom: none; }
+.hist-date { float: right; color: var(--ink-faint); font-size: 12px; }
+
+/* 星盘排盘图 */
+.chart-wrap { display: flex; justify-content: center; margin: 4px 0 14px; }
+.chart-wheel { display: block; width: 100%; max-width: 280px; height: auto; }
+/* 三大落座（日月升） */
+.astro-big3 { margin-bottom: 12px; }
+.big3-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); padding: 7px 0; border-bottom: 1px solid rgba(166,123,184,.12); }
+.big3-row:last-child { border-bottom: none; }
+.big3-glyph { font-size: 17px; width: 18px; text-align: center; flex: 0 0 auto; }
+.big3-name { color: var(--ink-faint); font-size: 12.5px; width: 30px; flex: 0 0 auto; }
+.big3-sign { font-weight: 600; flex: 1 1 auto; }
+.big3-el { font-size: 11px; padding: 2px 7px; border-radius: 10px; flex: 0 0 auto; }
+.big3-deg { color: var(--ink-faint); font-size: 12px; width: 34px; text-align: right; flex: 0 0 auto; }
+/* 星盘解读 */
+.astro-readings { margin-top: 4px; }
+.astro-read-block { margin-bottom: 12px; }
+.astro-read-block:last-child { margin-bottom: 0; }
+.arb-h { font-size: 14px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 4px; }
+.arb-p { font-size: 14px; color: var(--ink-soft); line-height: 1.9; }
+.form-hint { display: block; margin-top: 5px; font-size: 12px; color: var(--ink-faint); }
+.form-two { display: flex; gap: 10px; }
+.form-two .form-group { flex: 1 1 0; min-width: 0; }
+
+/* 本命星盘：图例 / 行星表 / 相位 */
+.chart-legend { margin: -6px 0 14px; text-align: center; }
+.lg-planets { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; margin-bottom: 6px; }
+.lg-p { font-size: 11.5px; color: var(--ink-soft); }
+.lg-aspects { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; }
+.lg-a { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ink-faint); }
+.lg-a i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.astro-sec-title { font-size: 13px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin: 14px 0 6px; }
+.astro-table { border-top: 1px solid rgba(166,123,184,.12); }
+.pt-head, .pt-row { display: grid; grid-template-columns: 1.15fr 1.15fr .55fr .8fr; gap: 6px; align-items: center; padding: 6px 0; font-size: 13px; }
+.pt-head { font-size: 11.5px; color: var(--ink-faint); border-bottom: 1px solid rgba(166,123,184,.12); }
+.pt-row { border-bottom: 1px solid rgba(166,123,184,.08); }
+.pt-row:last-child { border-bottom: none; }
+.pt-p { color: var(--ink); }
+.pt-r { color: #d9534f; font-style: normal; font-size: 12px; margin-left: 2px; }
+.pt-s { color: var(--ink); }
+.pt-d, .pt-h { color: var(--ink-faint); font-size: 12px; }
+.astro-aspects { font-size: 13px; }
+.asp-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(166,123,184,.08); }
+.asp-row:last-child { border-bottom: none; }
+.asp-tag { font-size: 10.5px; color: #fff; padding: 2px 7px; border-radius: 9px; flex: 0 0 auto; }
+.asp-b { flex: 1 1 auto; color: var(--ink); }
+.asp-o { font-size: 11.5px; color: var(--ink-faint); flex: 0 0 auto; }
+.asp-none { font-size: 13px; color: var(--ink-faint); line-height: 1.8; }
+.big3-house { font-size: 11px; color: var(--ink-faint); flex: 0 0 auto; }
+@media (max-width: 400px) {
+  .pt-head, .pt-row { grid-template-columns: 1fr 1fr .5fr .7fr; font-size: 12px; }
+}
+
+/* 分享卡弹窗 */
+.share-card { margin: 4px 0 12px; }
+.share-card canvas { display: block; width: 100%; border-radius: 16px; box-shadow: 0 6px 20px rgba(139,107,172,.18); }
+.share-card-btns { display: flex; gap: 10px; justify-content: center; }

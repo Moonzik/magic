@@ -21,6 +21,11 @@
     s.tarotHistory = Array.isArray(s.tarotHistory) ? s.tarotHistory : [];
     s.stardiceHistory = Array.isArray(s.stardiceHistory) ? s.stardiceHistory : [];
     s.ziweiHistory = Array.isArray(s.ziweiHistory) ? s.ziweiHistory : [];
+    s.oracleHistory = Array.isArray(s.oracleHistory) ? s.oracleHistory : [];
+    s.runeHistory = Array.isArray(s.runeHistory) ? s.runeHistory : [];
+    s.pendulumHistory = Array.isArray(s.pendulumHistory) ? s.pendulumHistory : [];
+    s.westernHistory = Array.isArray(s.westernHistory) ? s.westernHistory : [];
+    s.numeroHistory = Array.isArray(s.numeroHistory) ? s.numeroHistory : [];
     s.checkedIn = s.checkedIn && typeof s.checkedIn === 'object' ? s.checkedIn : {};
     if (typeof s.muted !== 'boolean') s.muted = false;
     if (!s.createdAt) s.createdAt = new Date().toISOString();
@@ -103,8 +108,9 @@
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(pages[pageId]).classList.add('active');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.nav === pageId));
-    if (pageId === 'home') { computeAffirmation(); renderAffirmation(); }
+    if (pageId === 'home') { computeAffirmation(); renderAffirmation(); renderDailyCard(); }
     if (pageId === 'wish') { renderWishes(); }
+    if (pageId === 'music') { showMusic('custom'); }
     if (pageId === 'divination') { resetTarot(); renderAstroHistory(); showDivine('tarot'); }
     if (pageId === 'destiny') {
       const fd = document.getElementById('fateDate');
@@ -117,28 +123,43 @@
         const t = new Date();
         zd.value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
       }
+      const ad = document.getElementById('astroDate');
+      if (ad && !ad.value) {
+        const t = new Date();
+        ad.value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+      }
+      const nd = document.getElementById('numeroDate');
+      if (nd && !nd.value) {
+        const t = new Date();
+        nd.value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+      }
       showDestiny('fate');
     }
     if (pageId === 'mine') { renderMine(); }
     window.scrollTo(0, 0);
   }
-  // 合并板块：占卜（塔罗/星骰）与命理（八字/紫微）的子导航切换
+  // 合并板块：占卜（塔罗/星骰/神谕卡/卢恩/灵摆）与命理（八字/紫微/星盘/数字命理）的子导航切换
   function showDivine(sub) {
-    const t = document.getElementById('divTarot'), s = document.getElementById('divStardice');
-    if (t) t.style.display = sub === 'tarot' ? '' : 'none';
-    if (s) s.style.display = sub === 'stardice' ? '' : 'none';
+    const map = { tarot: 'divTarot', stardice: 'divStardice', oracle: 'divOracle', runes: 'divRunes', pendulum: 'divPendulum' };
+    Object.keys(map).forEach(k => { const el = document.getElementById(map[k]); if (el) el.style.display = (k === sub) ? '' : 'none'; });
     document.querySelectorAll('#divTabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
   }
   function showDestiny(sub) {
-    const f = document.getElementById('destFate'), z = document.getElementById('destZiwei');
-    if (f) f.style.display = sub === 'fate' ? '' : 'none';
-    if (z) z.style.display = sub === 'ziwei' ? '' : 'none';
+    const map = { fate: 'destFate', ziwei: 'destZiwei', astro: 'destAstro', numero: 'destNumero' };
+    Object.keys(map).forEach(k => { const el = document.getElementById(map[k]); if (el) el.style.display = (k === sub) ? '' : 'none'; });
     document.querySelectorAll('#destTabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
+  }
+  function showMusic(sub) {
+    const map = { custom: 'musicCustom', lib: 'musicLib', scripture: 'musicScripture' };
+    Object.keys(map).forEach(k => { const el = document.getElementById(map[k]); if (el) el.style.display = (k === sub) ? '' : 'none'; });
+    document.querySelectorAll('#musicTabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
   }
   const divTabsEl = document.getElementById('divTabs');
   if (divTabsEl) divTabsEl.addEventListener('click', (e) => { const b = e.target.closest('.subtab'); if (b) showDivine(b.dataset.sub); });
   const destTabsEl = document.getElementById('destTabs');
   if (destTabsEl) destTabsEl.addEventListener('click', (e) => { const b = e.target.closest('.subtab'); if (b) showDestiny(b.dataset.sub); });
+  const musicTabsEl = document.getElementById('musicTabs');
+  if (musicTabsEl) musicTabsEl.addEventListener('click', (e) => { const b = e.target.closest('.subtab'); if (b) showMusic(b.dataset.sub); });
   // 事件委托：支持动态生成的 [data-nav] 按钮（如个人主页里的「去排盘」）
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-nav]');
@@ -1612,6 +1633,7 @@
     let cloudAudio = null;          // 当前播放的云端 TTS 音频
     let useSpeechFallback = false;  // 云端失败则整段回退系统语音
     let cachedVoice = null;
+    let activeTarget = null;  // 经文库朗读时指向当前 .sl-read 按钮与 .sl-line 行，使按钮标签/高亮跟随文库而非播放器
     // ===== 轻度空间混响（让女声更贴耳自然、与背景音乐相融，而非压在音乐之上）=====
     let audioCtx = null, reverbWarm = null, reverbDry = null, reverbWet = null, reverbMaster = null, reverbConv = null;
     function makeReverbIR(ctx, seconds, decay) {
@@ -1668,8 +1690,9 @@
       window.speechSynthesis.onvoiceschanged = refreshVoice;
     }
     function voice() { if (!cachedVoice) refreshVoice(); return cachedVoice; }
-    function setBtn(txt) { const b = document.getElementById('btnScripture'); if (b) b.textContent = txt; }
+    function setBtn(txt) { const b = activeTarget ? activeTarget.btn : document.getElementById('btnScripture'); if (b) b.textContent = txt; }
     function collect() {
+      if (activeTarget) { textEls = Array.from(document.querySelectorAll(activeTarget.lineSel)); ssEls = []; return; }
       textEls = Array.from(document.querySelectorAll('#scriptureText .sr-line'));
       ssEls = Array.from(document.querySelectorAll('#ssScripture .sr-line'));
     }
@@ -1688,7 +1711,9 @@
       if (cloudAudio) { try { cloudAudio.pause(); cloudAudio.src = ''; } catch (e) {} cloudAudio = null; }
       if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
       clearActive();
-      setBtn('🔊 朗读');
+      setBtn('🔊 朗读');                                  // 先复位当前（可能是文库）按钮，此时 activeTarget 仍有效
+      document.querySelectorAll('.sl-read').forEach(b => b.textContent = '🔊 朗读'); // 安全网：文库按钮绝不留「停止」残影
+      activeTarget = null;                                // 复位后再清空，避免误指向已失效按钮
     }
 
     // ===== 云端 TTS：Edge 免费晓晓神经女声（zh-CN-XiaoxiaoNeural）=====
@@ -1780,8 +1805,9 @@
     }
 
     // ===== 朗读主流程：逐行云端生成并顺序播放，字幕精确同步；失败回退系统语音 =====
-    function read(lines) {
+    function read(lines, opts) {
       stop();
+      activeTarget = (opts && opts.btn) ? opts : null;
       collect();
       if (!lines || !lines.length) return false;
       reading = true; setBtn('⏸ 停止'); useSpeechFallback = false;
@@ -1849,7 +1875,7 @@
         box.style.display = 'block';
         setBtn('🔊 朗读');
       },
-      start(lines) { return read(lines); },
+      start(lines, opts) { return read(lines, opts); },
       toggle(lines) { if (reading) { stop(); return false; } return read(lines); },
       stop,
       isReading() { return reading; }
@@ -3052,9 +3078,491 @@
   });
   updateAudioIcon();
 
+  // ===== 新增功能：每日一牌 / 经文库 / 神谕卡 / 卢恩 / 灵摆 / 西洋星盘 / 数字命理 / 分享卡 =====
+
+  // ---- 每日一牌 ----
+  function renderDailyCard() {
+    const box = document.getElementById('dailyInner');
+    if (!box) return;
+    const d = getDailyTarot(todayStr());
+    const c = d.card;
+    const sym = c.emoji || (c.kind === 'major' ? '🌟' : (c.glyph || '🎴'));
+    const revTxt = d.reversed ? '（逆位）' : '（正位）';
+    box.innerHTML = '<div class="daily-card-face">'
+      + '<div class="daily-sym">' + sym + '</div>'
+      + '<div class="daily-name">' + escapeHtml(c.name) + ' <span class="daily-rev">' + revTxt + '</span></div>'
+      + '<div class="daily-meaning">' + escapeHtml(d.meaning) + '</div></div>';
+  }
+  const dailyShareB = document.getElementById('btnDailyShare');
+  if (dailyShareB) dailyShareB.addEventListener('click', () => {
+    const d = getDailyTarot(todayStr());
+    const c = d.card;
+    showShareModal({
+      emoji: c.emoji || (c.kind === 'major' ? '🌟' : (c.glyph || '🎴')),
+      title: '今日一牌 · ' + c.name + (d.reversed ? '（逆位）' : '（正位）'),
+      lines: [d.meaning, '—— 光屿 · 塔罗指引'], accent: '#8a7bd8'
+    });
+  });
+  const dailyRedrawB = document.getElementById('btnDailyRedraw');
+  if (dailyRedrawB) dailyRedrawB.addEventListener('click', () => {
+    const idx = Math.floor(Math.random() * TAROT_DECK.length);
+    const c = TAROT_DECK[idx];
+    const reversed = Math.random() < 0.4;
+    const d = { card: c, reversed, meaning: reversed ? c.reversed : c.upright };
+    const sym = c.emoji || (c.kind === 'major' ? '🌟' : (c.glyph || '🎴'));
+    const box = document.getElementById('dailyInner');
+    if (box) box.innerHTML = '<div class="daily-card-face"><div class="daily-sym">' + sym + '</div>'
+      + '<div class="daily-name">' + escapeHtml(c.name) + ' <span class="daily-rev">' + (reversed ? '（逆位）' : '（正位）') + '</span></div>'
+      + '<div class="daily-meaning">' + escapeHtml(d.meaning) + '</div></div>';
+    toast('为你重抽了一张 🎴');
+  });
+
+  // ---- 经文库 ----
+  function renderScriptureLib(cat) {
+    const box = document.getElementById('scriptureLib');
+    if (!box) return;
+    const list = SCRIPTURE_LIB[cat] || [];
+    box.innerHTML = list.map((it, i) => {
+      const linesHtml = it.lines.map(l => '<div class="sl-line">' + escapeHtml(l) + '</div>').join('');
+      return '<div class="sl-item" data-i="' + i + '">'
+        + '<div class="sl-title">' + escapeHtml(it.title) + ' <button class="btn btn-ghost btn-sm sl-read" data-i="' + i + '" type="button">🔊 朗读</button></div>'
+        + '<div class="sl-lines">' + linesHtml + '</div></div>';
+    }).join('');
+  }
+  let libActiveBtn = null;
+  const scriptureLibEl = document.getElementById('scriptureLib');
+  if (scriptureLibEl) scriptureLibEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.sl-read');
+    if (!btn) return;
+    const i = +btn.dataset.i;
+    const cat = (document.querySelector('#scriptureCats .chip.active') || {}).dataset.cat || '静心';
+    const item = SCRIPTURE_LIB[cat][i];
+    if (ScriptureReader.isReading()) {
+      if (btn === libActiveBtn) { ScriptureReader.stop(); libActiveBtn = null; return; }   // 同篇：停止
+      ScriptureReader.stop();                                                           // 异篇：先停再切
+    }
+    ScriptureReader.start(item.lines, { btn: btn, lineSel: '#scriptureLib .sl-item[data-i="' + i + '"] .sl-line' });
+    libActiveBtn = btn;
+    toast('正在朗读：' + item.title + ' 🔊');
+  });
+  const scriptureCatsEl = document.getElementById('scriptureCats');
+  if (scriptureCatsEl) scriptureCatsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    scriptureCatsEl.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === b));
+    renderScriptureLib(b.dataset.cat);
+  });
+  renderScriptureLib('静心');
+
+  // ---- 神谕卡 ----
+  function renderOracle(card) {
+    const box = document.getElementById('oracleCard');
+    if (box) box.innerHTML = '<div class="oracle-emoji">' + card.emoji + '</div><div class="oracle-name">' + escapeHtml(card.name) + '</div><div class="oracle-msg">' + escapeHtml(card.msg) + '</div>';
+    const res = document.getElementById('oracleResult'); if (res) res.style.display = 'block';
+    const hc = document.getElementById('oracleHistory');
+    if (hc) hc.innerHTML = store.oracleHistory.slice(0, 5).map(o => '<div class="hist-row">🃏 ' + escapeHtml(o.name) + '</div>').join('');
+    const hCard = document.getElementById('oracleHistoryCard'); if (hCard) hCard.style.display = store.oracleHistory.length ? 'block' : 'none';
+  }
+  const oracleDrawB = document.getElementById('btnOracleDraw');
+  if (oracleDrawB) oracleDrawB.addEventListener('click', () => {
+    const card = ORACLE_CARDS[Math.floor(Math.random() * ORACLE_CARDS.length)];
+    store.oracleHistory = [{ name: card.name, t: new Date().toISOString() }].concat(store.oracleHistory).slice(0, 20);
+    saveStore(store); renderOracle(card);
+  });
+  const oracleAgainB = document.getElementById('btnOracleAgain');
+  if (oracleAgainB) oracleAgainB.addEventListener('click', () => { if (oracleDrawB) oracleDrawB.click(); });
+
+  // ---- 卢恩符文 ----
+  const runeDrawB = document.getElementById('btnRuneDraw');
+  if (runeDrawB) runeDrawB.addEventListener('click', () => {
+    const r = RUNES[Math.floor(Math.random() * RUNES.length)];
+    store.runeHistory = [{ name: r.name.split(' ')[0], glyph: r.glyph, t: new Date().toISOString() }].concat(store.runeHistory).slice(0, 20);
+    saveStore(store);
+    const box = document.getElementById('runeCard');
+    if (box) box.innerHTML = '<div class="rune-glyph">' + r.glyph + '</div><div class="rune-name">' + escapeHtml(r.name.split(' ')[0]) + '</div><div class="rune-meaning">' + escapeHtml(r.meaning) + '</div><div class="rune-advice">' + escapeHtml(r.advice) + '</div>';
+    const res = document.getElementById('runeResult'); if (res) res.style.display = 'block';
+    const hc = document.getElementById('runeHistory');
+    if (hc) hc.innerHTML = store.runeHistory.slice(0, 5).map(o => '<div class="hist-row">' + o.glyph + ' ' + escapeHtml(o.name) + '</div>').join('');
+    const hCard = document.getElementById('runeHistoryCard'); if (hCard) hCard.style.display = store.runeHistory.length ? 'block' : 'none';
+  });
+  const runeAgainB = document.getElementById('btnRuneAgain');
+  if (runeAgainB) runeAgainB.addEventListener('click', () => { if (runeDrawB) runeDrawB.click(); });
+
+  // ---- 灵摆 ----
+  const pendulumAskB = document.getElementById('btnPendulumAsk');
+  if (pendulumAskB) pendulumAskB.addEventListener('click', () => {
+    const r = Math.random();
+    const type = r < 0.42 ? 'yes' : (r < 0.84 ? 'no' : 'maybe');
+    const pool = PENDULUM_ANSWERS[type];
+    const msg = pool[Math.floor(Math.random() * pool.length)];
+    const box = document.getElementById('pendulumAns');
+    if (box) box.innerHTML = '<div class="pend-sym">' + (type === 'yes' ? '✅' : type === 'no' ? '⛔' : '⏳') + '</div><div class="pend-type">' + (type === 'yes' ? '是' : type === 'no' ? '否' : '再等等') + '</div><div class="pend-msg">' + escapeHtml(msg) + '</div>';
+    const res = document.getElementById('pendulumResult'); if (res) res.style.display = 'block';
+    store.pendulumHistory = [{ type: type, msg: msg, t: new Date().toISOString() }].concat(store.pendulumHistory || []).slice(0, 20);
+    saveStore(store);
+    const hc = document.getElementById('pendulumHistory');
+    if (hc) hc.innerHTML = (store.pendulumHistory || []).slice(0, 5).map(o => '<div class="hist-row">' + (o.type === 'yes' ? '✅' : o.type === 'no' ? '⛔' : '⏳') + ' ' + escapeHtml((o.msg || '').slice(0, 14)) + '</div>').join('');
+    const hCard = document.getElementById('pendulumHistoryCard'); if (hCard) hCard.style.display = (store.pendulumHistory && store.pendulumHistory.length) ? 'block' : 'none';
+  });
+  const pendulumAgainB = document.getElementById('btnPendulumAgain');
+  if (pendulumAgainB) pendulumAgainB.addEventListener('click', () => { if (pendulumAskB) pendulumAskB.click(); });
+
+  // ---- 西洋星盘（太阳 / 月亮 / 上升 排盘）----
+  const EL_COLOR = { '火': '#e8743b', '土': '#b08968', '风': '#e0b341', '水': '#4a90d9' };
+  const astroCitySel = document.getElementById('astroCity');
+  const astroDistSel = document.getElementById('astroDistrict');
+  function fillDistricts(cityName) {
+    if (!astroDistSel) return;
+    const city = CITY_DISTRICTS.find(c => c.name === cityName);
+    astroDistSel.innerHTML = '';
+    (city ? city.districts : []).forEach(dt => {
+      const o = document.createElement('option'); o.value = dt.n; o.textContent = dt.n; astroDistSel.appendChild(o);
+    });
+  }
+  if (astroCitySel && !astroCitySel.options.length) {
+    CITY_DISTRICTS.forEach(c => { const o = document.createElement('option'); o.value = c.name; o.textContent = c.name; astroCitySel.appendChild(o); });
+    astroCitySel.value = '北京市';
+    fillDistricts(astroCitySel.value);
+    astroCitySel.addEventListener('change', () => fillDistricts(astroCitySel.value));
+  }
+  let lastChart = null;
+  const astroForm = document.getElementById('astroForm');
+  if (astroForm) astroForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const dv = document.getElementById('astroDate').value;
+    const tv = document.getElementById('astroTime').value;
+    if (!dv) { toast('请选择出生日期'); return; }
+    if (!tv) { toast('请填写出生时间（用于推算上升与宫位）'); return; }
+    const p = dv.split('-').map(Number);
+    const t = tv.split(':').map(Number);
+    const cityName = (astroCitySel && astroCitySel.value) || '北京市';
+    const city = CITY_DISTRICTS.find(c => c.name === cityName) || CITY_DISTRICTS[0];
+    const dtName = (astroDistSel && astroDistSel.value) || '';
+    const dt = city.districts.find(x => x.n === dtName);
+    const lat = dt ? dt.lat : city.lat, lon = dt ? dt.lon : city.lon;
+    const chart = castChart(p[0], p[1], p[2], t[0] || 0, t[1] || 0, lat, lon);
+    lastChart = chart;
+    const wheel = document.getElementById('astroWheel'); if (wheel) wheel.innerHTML = buildNatalChart(chart);
+    const lg = document.getElementById('astroLegend'); if (lg) lg.innerHTML = astroLegend();
+    const big3 = document.getElementById('astroBig3');
+    if (big3) big3.innerHTML = astroBigRow('☉', '太阳', chart.sun) + astroBigRow('☽', '月亮', chart.moon) +
+      astroBigRow('↑', '上升', chart.asc) + astroBigRow('⇈', '天顶', chart.mc);
+    const pl = document.getElementById('astroPlanets');
+    if (pl) pl.innerHTML = '<div class="pt-head"><span>行星</span><span>星座</span><span>度数</span><span>宫位</span></div>' +
+      chart.planets.map(x => '<div class="pt-row"><span class="pt-p">' + x.glyph + ' ' + escapeHtml(x.name) + (x.retro ? '<i class="pt-r" title="逆行">℞</i>' : '') + '</span>' +
+        '<span class="pt-s">' + x.sign.sym + escapeHtml(x.sign.name) + '</span>' +
+        '<span class="pt-d">' + Math.round(x.deg) + '°</span>' +
+        '<span class="pt-h">第' + x.house + '宫</span></div>').join('');
+    const aspBox = document.getElementById('astroAspects');
+    const aspTitle = document.getElementById('astroAspectTitle');
+    const topAsp = chart.aspects.slice(0, 8);
+    if (aspTitle) aspTitle.textContent = '主要相位' + (chart.aspects.length ? '（共 ' + chart.aspects.length + ' 个，取最紧 8 个）' : '');
+    if (aspBox) aspBox.innerHTML = topAsp.length ? topAsp.map(a =>
+      '<div class="asp-row"><span class="asp-tag" style="background:' + a.type.color + '">' + escapeHtml(a.type.name) + '</span>' +
+      '<span class="asp-b">' + a.a.glyph + escapeHtml(a.a.name) + ' — ' + a.b.glyph + escapeHtml(a.b.name) + '</span>' +
+      '<span class="asp-o">误差 ' + a.orb.toFixed(1) + '°</span></div>').join('')
+      : '<div class="asp-none">这个时间点没有形成主要相位，行星之间彼此独立，能量比较分散。</div>';
+    const rd = document.getElementById('astroReadings');
+    if (rd) rd.innerHTML =
+      '<div class="astro-read-block"><div class="arb-h">☉ 太阳 · ' + chart.sun.sign.sym + escapeHtml(chart.sun.sign.name) + ' ' + Math.round(chart.sun.deg) + '° · 第' + chart.sun.house + '宫</div><div class="arb-p">' + escapeHtml(astroSunText(chart.sun)) + '</div></div>' +
+      '<div class="astro-read-block"><div class="arb-h">☽ 月亮 · ' + chart.moon.sign.sym + escapeHtml(chart.moon.sign.name) + ' ' + Math.round(chart.moon.deg) + '° · 第' + chart.moon.house + '宫</div><div class="arb-p">' + escapeHtml(astroMoonText(chart.moon)) + '</div></div>' +
+      '<div class="astro-read-block"><div class="arb-h">↑ 上升 · ' + chart.asc.sign.sym + escapeHtml(chart.asc.sign.name) + ' ' + Math.round(chart.asc.deg) + '°</div><div class="arb-p">' + escapeHtml(astroAscText(chart.asc.sign)) + '</div></div>' +
+      '<div class="astro-read-block"><div class="arb-h">⇈ 天顶 · ' + chart.mc.sign.sym + escapeHtml(chart.mc.sign.name) + ' ' + Math.round(chart.mc.deg) + '°</div><div class="arb-p">' + escapeHtml(astroMcText(chart.mc.sign)) + '</div></div>' +
+      topAsp.slice(0, 3).map(a => '<div class="astro-read-block"><div class="arb-h">' + a.a.glyph + escapeHtml(a.a.name) + ' ' + escapeHtml(a.type.name) + ' ' + a.b.glyph + escapeHtml(a.b.name) + '（误差 ' + a.orb.toFixed(1) + '°）</div><div class="arb-p">' + escapeHtml(astroAspectText(a)) + '</div></div>').join('') +
+      '<div class="astro-read-block"><div class="arb-h">✦ 综合</div><div class="arb-p">' + escapeHtml(astroSynthText(chart)) + '</div></div>';
+    const res = document.getElementById('astroResultNatal'); if (res) res.style.display = 'block';
+    store.westernHistory = [{ sun: chart.sun.sign.name, moon: chart.moon.sign.name, asc: chart.asc.sign.name, t: new Date().toISOString() }].concat(store.westernHistory).slice(0, 20);
+    saveStore(store);
+    renderWesternHistory();
+  });
+  const astroSynB = document.getElementById('btnAstroSynastry');
+  if (astroSynB) astroSynB.addEventListener('click', () => {
+    const dv = document.getElementById('astroDate').value;
+    if (!dv) { toast('先排出你的星盘'); return; }
+    const p = dv.split('-').map(Number);
+    const s1 = getSunSign(p[1], p[2]);
+    const other = prompt('输入对方出生日期（YYYY-MM-DD），查看太阳星座合盘：');
+    if (!other) return;
+    const op = other.split('-').map(Number);
+    if (op.length !== 3 || !op[0] || !op[1] || !op[2]) { toast('日期格式不对'); return; }
+    const s2 = getSunSign(op[1], op[2]);
+    const key = s1.el + '-' + s2.el;
+    const text = SYNASTRY[key] || SYNASTRY[s2.el + '-' + s1.el] || '两个灵魂相遇，自有它的功课与礼物。';
+    const box = document.getElementById('astroSynastry');
+    if (box) { box.innerHTML = '<div class="syn-title">' + s1.sym + ' ' + escapeHtml(s1.name) + ' ✕ ' + s2.sym + ' ' + escapeHtml(s2.name) + '</div><div class="syn-text">' + escapeHtml(text) + '</div>'; box.style.display = 'block'; }
+  });
+  const astroShareB = document.getElementById('btnAstroShare');
+  if (astroShareB) astroShareB.addEventListener('click', () => {
+    if (!lastChart) { toast('先排出你的星盘'); return; }
+    const c = lastChart;
+    const lines = [
+      '☉ 太阳 ' + c.sun.sign.sym + c.sun.sign.name + ' ' + Math.round(c.sun.deg) + '° · 第' + c.sun.house + '宫',
+      '☽ 月亮 ' + c.moon.sign.sym + c.moon.sign.name + ' ' + Math.round(c.moon.deg) + '° · 第' + c.moon.house + '宫',
+      '↑ 上升 ' + c.asc.sign.sym + c.asc.sign.name + ' ' + Math.round(c.asc.deg) + '°',
+      '⇈ 天顶 ' + c.mc.sign.sym + c.mc.sign.name + ' ' + Math.round(c.mc.deg) + '°'
+    ];
+    if (c.aspects.length) {
+      const a = c.aspects[0];
+      lines.push(a.a.glyph + a.a.name + ' ' + a.type.name + ' ' + a.b.glyph + a.b.name);
+    }
+    lines.push('—— 光屿 · 本命星盘');
+    showShareModal({ emoji: '🌞', title: '我的本命星盘', lines: lines, accent: '#5b8fd0' });
+  });
+  function astroBigRow(g, name, o) {
+    const col = EL_COLOR[o.sign.el] || '#888';
+    const house = (o.house !== undefined) ? '<span class="big3-house">第' + o.house + '宫</span>' : '';
+    return '<div class="big3-row"><span class="big3-glyph" style="color:' + col + '">' + g + '</span>' +
+      '<span class="big3-name">' + name + '</span>' +
+      '<span class="big3-sign">' + o.sign.sym + ' ' + escapeHtml(o.sign.name) + '</span>' +
+      '<span class="big3-el" style="background:' + col + '22;color:' + col + '">' + o.sign.el + '</span>' +
+      '<span class="big3-deg">' + Math.round(o.deg) + '°</span>' + house + '</div>';
+  }
+  function astroSunText(p) {
+    return '你是' + p.sign.trait + '。' + p.sign.reading + '太阳落在第' + p.house + '宫，这股' + p.sign.el + '的能量，主要用在' + HOUSE_BRIEF[p.house - 1] + '上。';
+  }
+  function astroMoonText(p) {
+    const s = p.sign;
+    const tip = s.el === '水' ? '情绪起伏时，给自己一点柔软的空间' : s.el === '火' ? '情绪上来时，找个健康的出口释放' : s.el === '土' ? '把内在的安稳先安顿好' : '多和人说说话、把感受讲出来';
+    return '你的内在情绪与安全感，带着' + s.el + '的质地——' + s.trait + '。' + tip + '。月亮落在第' + p.house + '宫，心安的开关往往藏在' + HOUSE_BRIEF[p.house - 1] + '里。';
+  }
+  function astroAscText(s) { return '别人初见你，容易感到' + s.el + '的气质。你对外展现的样子，是' + s.trait + '。'; }
+  function astroMcText(s) { return '在事业与公众面前，你容易呈现出' + s.el + '的样子——' + s.trait + '。这是你被世界记住的方式，也是你心里想成为的样子。'; }
+  function astroAspectText(a) {
+    const A = a.a.name, B = a.b.name;
+    if (a.type.key === 'conj') return A + '与' + B + '的能量叠在一起，这部分特质被放大，是你身上很鲜明的底色。';
+    if (a.type.key === 'sextile') return A + '与' + B + '相互成全，是一份你可以主动去用的天赋，越用越顺手。';
+    if (a.type.key === 'trine') return A + '与' + B + '天然顺畅，你在这两股能量之间切换得很自然，这是你的舒适区。';
+    if (a.type.key === 'square') return A + '与' + B + '彼此摩擦，会反复带来压力，但也正是你成长最快的地方。';
+    if (a.type.key === 'opp') return A + '与' + B + '像天平的两端，容易来回摇摆；学会平衡，是这门功课的重点。';
+    return A + '与' + B + '形成' + a.type.name + '，这两股能量之间有' + a.type.nature + '的互动。';
+  }
+  function astroSynthText(c) {
+    const els = [c.sun.sign.el, c.moon.sign.el, c.asc.sign.el];
+    const uniq = Array.from(new Set(els));
+    let s;
+    if (uniq.length === 1) s = '你的日月升都落在' + els[0] + '象，气质非常统一：' + els[0] + '的特质在你身上被放大，也最容易被别人看见。';
+    else if (uniq.length === 2) s = '你的日月升横跨' + uniq.join('与') + '两个元素，内在有张力也有层次——在' + c.sun.sign.name + '的核心、' + c.moon.sign.name + '的情绪、' + c.asc.sign.name + '的面具之间，慢慢找到自己的节奏。';
+    else s = '你的日月升散布在火水土风之中，丰富而复杂：太阳' + c.sun.sign.name + '、月亮' + c.moon.sign.name + '、上升' + c.asc.sign.name + '，像几种音色合在一起，需要一点时间去听见完整的自己。';
+    const retro = c.planets.filter(x => x.retro).map(x => x.name);
+    if (retro.length) s += '盘中有' + retro.join('、') + '处于逆行，这几股能量往内收，更适合用来沉淀与复盘，而不是急着向外推进。';
+    return s;
+  }
+  function astroLegend() {
+    return '<div class="lg-planets">' + PLANET_META.map(m => '<span class="lg-p">' + m.glyph + escapeHtml(m.name) + '</span>').join('') + '</div>' +
+      '<div class="lg-aspects">' + ASPECTS.map(a => '<span class="lg-a"><i style="background:' + a.color + '"></i>' + escapeHtml(a.name) + '</span>').join('') + '</div>';
+  }
+  // 本命盘：星座环 + 十二宫 + 上升/天顶轴 + 行星落点 + 相位连线
+  function buildNatalChart(chart) {
+    const C = 210, R_OUT = 202, R_SIGN_IN = 174, R_HOUSE_IN = 142, R_ASPECT = 88;
+    const asc = chart.asc.lon;
+    const SIGN_BY_KEY = {}; WESTERN_SIGNS.forEach(s => { SIGN_BY_KEY[s.key] = s; });
+    // 黄经 → 屏幕角：上升固定落在正左方（与真实星盘一致）
+    const phi = (lon) => (180 - ((((lon - asc) % 360) + 360) % 360)) * Math.PI / 180;
+    const pt = (lon, r) => { const a = phi(lon); return { x: C + r * Math.cos(a), y: C + r * Math.sin(a) }; };
+    const ring = (rOut, rIn, lonA, lonB) => {
+      const a = phi(lonA), b = phi(lonB);
+      const o1x = C + rOut * Math.cos(a), o1y = C + rOut * Math.sin(a);
+      const o2x = C + rOut * Math.cos(b), o2y = C + rOut * Math.sin(b);
+      const i2x = C + rIn * Math.cos(b), i2y = C + rIn * Math.sin(b);
+      const i1x = C + rIn * Math.cos(a), i1y = C + rIn * Math.sin(a);
+      return 'M' + o1x.toFixed(1) + ' ' + o1y.toFixed(1) + ' A' + rOut + ' ' + rOut + ' 0 0 1 ' + o2x.toFixed(1) + ' ' + o2y.toFixed(1) +
+        ' L' + i2x.toFixed(1) + ' ' + i2y.toFixed(1) + ' A' + rIn + ' ' + rIn + ' 0 0 0 ' + i1x.toFixed(1) + ' ' + i1y.toFixed(1) + ' Z';
+    };
+    let svg = '<svg viewBox="0 0 420 420" class="chart-wheel" role="img" aria-label="本命星盘">';
+    for (let i = 0; i < 12; i++) {
+      const sg = SIGN_BY_KEY[SIGN_TROPICAL[i]]; const col = EL_COLOR[sg.el] || '#999';
+      svg += '<path d="' + ring(R_OUT, R_SIGN_IN, i * 30, i * 30 + 30) + '" fill="' + col + '" fill-opacity="0.17"/>';
+    }
+    for (let i = 0; i < 12; i++) {
+      const sg = SIGN_BY_KEY[SIGN_TROPICAL[i]]; const col = EL_COLOR[sg.el] || '#666';
+      const p = pt(i * 30 + 15, 188);
+      svg += '<text x="' + p.x.toFixed(1) + '" y="' + p.y.toFixed(1) + '" font-size="17" text-anchor="middle" dominant-baseline="central" fill="' + col + '">' + sg.sym + '</text>';
+    }
+    for (let k = 0; k < 12; k++) {
+      const a = phi(asc + k * 30);
+      svg += '<line x1="' + (C + R_HOUSE_IN * Math.cos(a)).toFixed(1) + '" y1="' + (C + R_HOUSE_IN * Math.sin(a)).toFixed(1) +
+        '" x2="' + (C + R_OUT * Math.cos(a)).toFixed(1) + '" y2="' + (C + R_OUT * Math.sin(a)).toFixed(1) +
+        '" stroke="rgba(166,123,184,.35)" stroke-width="1"/>';
+      const hn = pt(asc + k * 30 + 15, 158);
+      svg += '<text x="' + hn.x.toFixed(1) + '" y="' + hn.y.toFixed(1) + '" font-size="9.5" text-anchor="middle" dominant-baseline="central" fill="#a899b8">' + (k + 1) + '</text>';
+    }
+    svg += '<circle cx="' + C + '" cy="' + C + '" r="' + R_OUT + '" fill="none" stroke="rgba(166,123,184,.55)" stroke-width="1.5"/>';
+    svg += '<circle cx="' + C + '" cy="' + C + '" r="' + R_SIGN_IN + '" fill="none" stroke="rgba(166,123,184,.45)"/>';
+    svg += '<circle cx="' + C + '" cy="' + C + '" r="' + R_HOUSE_IN + '" fill="none" stroke="rgba(166,123,184,.45)"/>';
+    svg += '<circle cx="' + C + '" cy="' + C + '" r="' + (R_ASPECT + 12) + '" fill="none" stroke="rgba(166,123,184,.2)" stroke-dasharray="3 4"/>';
+    const aA = pt(asc, R_OUT), aD = pt(asc + 180, R_OUT);
+    svg += '<line x1="' + aA.x.toFixed(1) + '" y1="' + aA.y.toFixed(1) + '" x2="' + aD.x.toFixed(1) + '" y2="' + aD.y.toFixed(1) + '" stroke="#8e6fa8" stroke-width="2"/>';
+    const mA = pt(chart.mc.lon, R_HOUSE_IN), mD = pt(chart.mc.lon + 180, R_HOUSE_IN);
+    svg += '<line x1="' + mA.x.toFixed(1) + '" y1="' + mA.y.toFixed(1) + '" x2="' + mD.x.toFixed(1) + '" y2="' + mD.y.toFixed(1) + '" stroke="#8e6fa8" stroke-width="1.4" stroke-dasharray="5 4"/>';
+    svg += '<text x="' + (aA.x - 5).toFixed(1) + '" y="' + (aA.y - 8).toFixed(1) + '" font-size="10" font-weight="700" fill="#6b5b95" text-anchor="end">ASC</text>';
+    svg += '<text x="' + (aD.x + 5).toFixed(1) + '" y="' + (aD.y - 8).toFixed(1) + '" font-size="10" font-weight="700" fill="#6b5b95">DSC</text>';
+    svg += '<text x="' + mA.x.toFixed(1) + '" y="' + (mA.y - 7).toFixed(1) + '" font-size="10" font-weight="700" fill="#6b5b95" text-anchor="middle">MC</text>';
+    svg += '<text x="' + mD.x.toFixed(1) + '" y="' + (mD.y + 15).toFixed(1) + '" font-size="10" font-weight="700" fill="#6b5b95" text-anchor="middle">IC</text>';
+    chart.aspects.slice(0, 18).forEach(a => {
+      const p1 = pt(a.a.lon, R_ASPECT), p2 = pt(a.b.lon, R_ASPECT);
+      const op = Math.max(0.25, 0.85 - (a.orb / a.type.orb) * 0.6);
+      svg += '<line x1="' + p1.x.toFixed(1) + '" y1="' + p1.y.toFixed(1) + '" x2="' + p2.x.toFixed(1) + '" y2="' + p2.y.toFixed(1) +
+        '" stroke="' + a.type.color + '" stroke-width="1.3" stroke-opacity="' + op.toFixed(2) + '"/>';
+    });
+    const sorted = chart.planets.slice().sort((x, y) => ((((x.lon - asc) % 360) + 360) % 360) - ((((y.lon - asc) % 360) + 360) % 360));
+    const tiers = [118, 100, 134, 84];
+    const lastAt = {};
+    sorted.forEach(p => {
+      const rel = ((p.lon - asc) % 360 + 360) % 360;
+      let t = 0;
+      while (t < tiers.length - 1) {
+        const prev = lastAt[t];
+        if (prev === undefined) break;
+        const d = Math.abs(rel - prev); const cd = Math.min(d, 360 - d);
+        if (cd < 11) t++; else break;
+      }
+      lastAt[t] = rel;
+      const pos = pt(p.lon, tiers[t]);
+      const col = EL_COLOR[p.sign.el] || '#666';
+      svg += '<text x="' + pos.x.toFixed(1) + '" y="' + pos.y.toFixed(1) + '" font-size="15" text-anchor="middle" dominant-baseline="central" fill="' + col + '">' + p.glyph + '</text>';
+      svg += '<text x="' + pos.x.toFixed(1) + '" y="' + (pos.y + 11).toFixed(1) + '" font-size="8.5" text-anchor="middle" fill="#8b7f99">' + Math.round(p.deg) + '°' + (p.retro ? '℞' : '') + '</text>';
+    });
+    svg += '<text x="' + C + '" y="' + (C + 4) + '" font-size="10" text-anchor="middle" fill="#b3a6c2">本命盘</text>';
+    svg += '</svg>';
+    return svg;
+  }
+  function renderWesternHistory() {
+    const card = document.getElementById('astroWhistoryCard');
+    const box = document.getElementById('astroWhistory');
+    if (!card || !box) return;
+    const h = store.westernHistory || [];
+    if (!h.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    box.innerHTML = h.slice(0, 6).map(r => {
+      const d = new Date(r.t); const ds = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+      return '<div class="hist-row"><span>☉' + escapeHtml(r.sun) + ' · ☽' + escapeHtml(r.moon) + ' · ↑' + escapeHtml(r.asc) + '</span><span class="hist-date">' + ds + '</span></div>';
+    }).join('');
+  }
+
+  // ---- 数字命理 ----
+  const numeroForm = document.getElementById('numeroForm');
+  if (numeroForm) numeroForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const dv = document.getElementById('numeroDate').value;
+    if (!dv) { toast('请选择出生日期'); return; }
+    const p = dv.split('-').map(Number);
+    const n = computeLifePath(p[0], p[1], p[2]);
+    const info = LIFE_PATH_MEANINGS[n] || { name: '未知', text: '' };
+    const numBox = document.getElementById('numeroNum'); if (numBox) numBox.innerHTML = '<span class="numero-big">' + n + '</span>';
+    const nameBox = document.getElementById('numeroName'); if (nameBox) nameBox.textContent = '生命数字 ' + n + ' · ' + info.name;
+    const textBox = document.getElementById('numeroText'); if (textBox) textBox.textContent = info.text;
+    const res = document.getElementById('numeroResult'); if (res) res.style.display = 'block';
+    store.numeroHistory = [{ n: n, t: new Date().toISOString() }].concat(store.numeroHistory).slice(0, 20);
+    saveStore(store);
+  });
+  const numeroShareB = document.getElementById('btnNumeroShare');
+  if (numeroShareB) numeroShareB.addEventListener('click', () => {
+    const dv = document.getElementById('numeroDate').value; if (!dv) { toast('先算生命数字'); return; }
+    const p = dv.split('-').map(Number); const n = computeLifePath(p[0], p[1], p[2]);
+    const info = LIFE_PATH_MEANINGS[n] || { name: '', text: '' };
+    showShareModal({ emoji: '🔢', title: '我的生命数字 · ' + n + ' ' + info.name, lines: [info.text, '—— 光屿 · 数字命理'], accent: '#d9b25a' });
+  });
+
+  // ---- 通用分享卡 ----
+  function makeShareCanvas(opts) {
+    const W = 750, H = 1060;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#f7f0fa'); grad.addColorStop(0.5, '#efe6f6'); grad.addColorStop(1, '#f9f0e9');
+    g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    const orb = (x, y, r, c) => { const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, c); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+    orb(150, 180, 260, (opts.accent || '#c9a5d6') + '73');
+    orb(620, 320, 240, 'rgba(212,180,131,0.35)');
+    orb(400, 900, 300, 'rgba(224,163,176,0.30)');
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    for (let i = 0; i < 40; i++) { const x = (i * 137.5) % W, y = (i * 219.7) % H, r = (i % 3) * 0.8 + 1; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '120px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    g.fillText(opts.emoji || '✦', W / 2, 280);
+    g.fillStyle = '#3a3440'; g.font = 'bold 46px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(opts.title || '', W / 2, 440);
+    g.fillStyle = '#5a5466';
+    const lines = opts.lines || [];
+    const startY = 560, maxBottom = H - 150;
+    function layout(fs) {
+      const cpl = Math.max(6, Math.floor((W - 160) / (fs * 1.02)));
+      let tl = 0;
+      lines.forEach(line => { const chars = String(line).split(''); let s = 0; while (s < chars.length) { s += cpl; tl++; } });
+      return { cpl, tl, lineH: fs * 1.5 };
+    }
+    let fs = 30, lay = layout(30);
+    while (lay.tl * lay.lineH > (maxBottom - startY) && fs > 16) { fs -= 2; lay = layout(fs); }
+    g.font = fs + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+    let y = startY;
+    lines.forEach(line => {
+      const chars = String(line).split('');
+      let start = 0;
+      while (start < chars.length) {
+        const seg = chars.slice(start, start + lay.cpl).join('');
+        g.fillText(seg, W / 2, y); y += lay.lineH; start += lay.cpl;
+      }
+    });
+    g.fillStyle = '#a67bb8'; g.font = 'bold 30px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText('✦  光屿 · 玄学疗愈  ✦', W / 2, H - 120);
+    return cv;
+  }
+  function showShareModal(opts) {
+    let modal = document.getElementById('shareModal');
+    if (!modal) {
+      modal = document.createElement('div'); modal.id = 'shareModal'; modal.className = 'modal';
+      modal.innerHTML = '<div class="modal-mask" data-close="shareModal"></div><div class="modal-body"><div class="modal-head"><h3>分享卡片</h3><button class="modal-close" data-close="shareModal">✕</button></div><div id="shareModalBody"></div></div>';
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => { if (e.target.dataset.close) modal.style.display = 'none'; });
+    }
+    modal.style.display = 'flex';
+    const body = modal.querySelector('#shareModalBody');
+    const cv = makeShareCanvas(opts);
+    body.innerHTML = '<div class="share-card"><canvas id="shareCanvasModal" style="width:100%;border-radius:16px;"></canvas></div><div class="share-card-btns"><button class="btn btn-primary btn-sm" id="btnSaveShareModal" type="button">保存为图片</button><button class="btn btn-ghost btn-sm" id="btnCopyShareModal" type="button">复制文案</button></div>';
+    const c = body.querySelector('#shareCanvasModal'); c.width = cv.width; c.height = cv.height; c.getContext('2d').drawImage(cv, 0, 0);
+    const copy = opts.lines ? (opts.emoji + ' ' + opts.title + '\n' + opts.lines.join('\n') + '\n—— 光屿 · 玄学疗愈') : '';
+    body.querySelector('#btnSaveShareModal').addEventListener('click', () => {
+      cv.toBlob(b => {
+        if (!b) { toast('生成失败，请再试一次'); return; }
+        const url = URL.createObjectURL(b); const a = document.createElement('a');
+        a.href = url; a.download = '光屿·分享.png'; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500); toast('图片已保存 📷');
+      }, 'image/png');
+    });
+    body.querySelector('#btnCopyShareModal').addEventListener('click', () => {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(copy).then(() => toast('已复制 ✨'), () => toast('复制失败'));
+      else toast(copy);
+    });
+  }
+
+  // ---- 现有结果的分享按钮 ----
+  const shareAffB = document.getElementById('shareAffirmation');
+  if (shareAffB) shareAffB.addEventListener('click', () => {
+    const t = (document.getElementById('affirmationText') || {}).textContent || '';
+    showShareModal({ emoji: '🌟', title: '今日肯定语', lines: [t, '—— 光屿 · 玄学疗愈'], accent: '#8a7bd8' });
+  });
+  const tarotShareB = document.getElementById('btnTarotShare');
+  if (tarotShareB) tarotShareB.addEventListener('click', () => {
+    const rc = document.getElementById('tarotRead');
+    const txt = rc ? rc.textContent.trim() : '';
+    showShareModal({ emoji: '🔮', title: '我的塔罗指引', lines: txt ? [txt.slice(0, 80)] : ['今天也为自己抽一张牌吧'], accent: '#8a7bd8' });
+  });
+  const fateShareB = document.getElementById('btnFateShare');
+  if (fateShareB) fateShareB.addEventListener('click', () => {
+    const dm = (document.getElementById('fateDayMaster') || {}).textContent || '';
+    const st = (document.getElementById('fateStrength') || {}).textContent || '';
+    showShareModal({ emoji: '📿', title: '我的八字 · 日主' + dm, lines: ['身' + st, '—— 光屿 · 命理'], accent: '#b9a06a' });
+  });
+  const ziweiShareB = document.getElementById('btnZiweiShare');
+  if (ziweiShareB) ziweiShareB.addEventListener('click', () => {
+    const sum = (document.getElementById('ziweiSummary') || {}).textContent || '';
+    showShareModal({ emoji: '🪐', title: '我的紫微命盘', lines: [sum.slice(0, 70) + (sum.length > 70 ? '…' : ''), '—— 光屿 · 命理'], accent: '#b9a06a' });
+  });
+
   // ===== 初始化 =====
   computeAffirmation();
   renderHome();
+  renderDailyCard();
+  renderWesternHistory();
   renderWishes();
   ensurePresets().then(renderLibrary).catch(() => renderLibrary());
 })();

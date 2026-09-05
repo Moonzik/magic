@@ -51,6 +51,7 @@
         <div class="affirmation-actions">
           <button class="btn btn-ghost btn-sm" id="refreshAffirmation">换一条</button>
           <button class="btn btn-ghost btn-sm" id="saveAffirmation">收藏</button>
+          <button class="btn btn-ghost btn-sm" id="shareAffirmation">分享</button>
         </div>
       </div>
 
@@ -58,6 +59,18 @@
       <div class="card tip-card">
         <div class="card-tag">今日小 Tips</div>
         <p class="tip-text" id="tipText">加载中…</p>
+      </div>
+
+      <!-- 每日一牌 -->
+      <div class="card daily-card" id="dailyCard">
+        <div class="card-tag">今日一牌 · 塔罗指引</div>
+        <div class="daily-inner" id="dailyInner">
+          <div class="daily-loading">正在抽牌…</div>
+        </div>
+        <div class="daily-actions">
+          <button class="btn btn-ghost btn-sm" id="btnDailyShare" type="button">分享</button>
+          <button class="btn btn-ghost btn-sm" id="btnDailyRedraw" type="button">再抽一次</button>
+        </div>
       </div>
 
       <!-- 快速入口 -->
@@ -94,8 +107,14 @@
         <button class="btn-back" data-nav="home">‹</button>
         <h2 class="page-title">定制音乐</h2>
       </div>
+      <div class="subtabs" id="musicTabs">
+        <button class="subtab active" type="button" data-sub="custom">🎵 定制</button>
+        <button class="subtab" type="button" data-sub="lib">📚 伴奏库</button>
+        <button class="subtab" type="button" data-sub="scripture">📜 经文库</button>
+      </div>
 
       <!-- 定制流程 -->
+      <div id="musicCustom">
       <div class="card">
         <div class="card-tag">定制你的高能量 Sub</div>
         <form id="musicForm" class="music-form">
@@ -192,7 +211,10 @@
         </div>
       </div>
 
+      </div><!-- /musicCustom -->
+
       <!-- 伴奏库（内置免版权曲库 + 我的上传，统一搜索筛选） -->
+      <div id="musicLib">
       <div class="card">
         <div class="card-tag">🎵 伴奏库</div>
         <p class="upload-hint">内置免版权合成曲库，开箱即播、可下载；也能上传你自己的 mp3 当专属伴奏。</p>
@@ -228,6 +250,24 @@
           <div class="music-list" id="importList"></div>
         </div>
       </div>
+      </div><!-- /musicLib -->
+
+      <!-- 子板块：经文库 -->
+      <div id="musicScripture" style="display:none;">
+        <div class="card">
+          <div class="card-tag">📜 经文库 · 静心朗读</div>
+          <p class="upload-hint">把疗愈短文当作睡前、通勤或静心时的陪伴，点开即朗读，声音柔和融于环境。</p>
+          <div class="lib-tools">
+            <div class="chip-group lib-filter" id="scriptureCats">
+              <button type="button" class="chip active" data-cat="静心">静心</button>
+              <button type="button" class="chip" data-cat="安眠">安眠</button>
+              <button type="button" class="chip" data-cat="疗愈">疗愈</button>
+              <button type="button" class="chip" data-cat="增福">增福</button>
+            </div>
+          </div>
+          <div class="scripture-lib" id="scriptureLib"></div>
+        </div>
+      </div>
     </section>
 
     <!-- 页面：占卜（塔罗 + 星骰） -->
@@ -238,6 +278,9 @@
       <div class="subtabs" id="divTabs">
         <button class="subtab active" type="button" data-sub="tarot">🔮 塔罗</button>
         <button class="subtab" type="button" data-sub="stardice">🔯 星骰</button>
+        <button class="subtab" type="button" data-sub="oracle">🃏 神谕卡</button>
+        <button class="subtab" type="button" data-sub="runes">ᚱ 卢恩</button>
+        <button class="subtab" type="button" data-sub="pendulum">🪀 灵摆</button>
       </div>
       <div id="divTarot">
       <div class="page-head">
@@ -285,6 +328,7 @@
         <div class="tarot-positions" id="tarotPositions"></div>
         <div class="tarot-actions" id="tarotResultActions" style="display:none;">
           <button type="button" class="btn btn-ghost btn-sm" id="btnRedraw">重新抽牌</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btnTarotShare">分享</button>
         </div>
       </div>
 
@@ -322,6 +366,76 @@
           <div id="astroHistory"></div>
         </div>
       </div>
+
+      <!-- 子板块：神谕卡 -->
+      <div id="divOracle" style="display:none;">
+        <div class="page-head">
+          <h2 class="page-title">🃏 神谕卡 · 直觉指引</h2>
+        </div>
+        <div class="card">
+          <div class="card-tag">静心默念你的问题，抽一张</div>
+          <p class="upload-hint">神谕卡是给直觉的一句温柔提醒，不是预言。你心里早就知道答案，它只是帮你听见。</p>
+          <button type="button" class="btn btn-primary btn-block" id="btnOracleDraw">🃏 抽一张神谕卡</button>
+        </div>
+        <div class="card" id="oracleResult" style="display:none;">
+          <div class="oracle-card" id="oracleCard"></div>
+          <div class="tarot-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnOracleAgain">再抽一张</button>
+          </div>
+        </div>
+        <div class="card" id="oracleHistoryCard" style="display:none;">
+          <div class="card-tag">最近抽过的神谕卡</div>
+          <div id="oracleHistory"></div>
+        </div>
+      </div>
+
+      <!-- 子板块：卢恩符文 -->
+      <div id="divRunes" style="display:none;">
+        <div class="page-head">
+          <h2 class="page-title">ᚱ 卢恩符文 · 北欧古字母</h2>
+        </div>
+        <div class="card">
+          <div class="card-tag">想一件事，掷出一枚符文</div>
+          <p class="upload-hint">卢恩是北欧古老的符号，每一枚都带着一种能量与提醒。当作自我对话的入口就好。</p>
+          <button type="button" class="btn btn-primary btn-block" id="btnRuneDraw">ᚱ 掷一枚符文</button>
+        </div>
+        <div class="card" id="runeResult" style="display:none;">
+          <div class="rune-card" id="runeCard"></div>
+          <div class="tarot-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnRuneAgain">再掷一枚</button>
+          </div>
+        </div>
+        <div class="card" id="runeHistoryCard" style="display:none;">
+          <div class="card-tag">最近掷出的符文</div>
+          <div id="runeHistory"></div>
+        </div>
+      </div>
+
+      <!-- 子板块：灵摆 -->
+      <div id="divPendulum" style="display:none;">
+        <div class="page-head">
+          <h2 class="page-title">🪀 灵摆 · 是/否指引</h2>
+        </div>
+        <div class="card">
+          <div class="card-tag">在心里问一个能答"是/否"的问题</div>
+          <p class="upload-hint">灵摆帮你把潜意识里的倾向，显成"是 / 否 / 再等等"。它映的是你已有的感觉，不是标准答案。</p>
+          <div class="form-group">
+            <label>你的问题（心里问也行）</label>
+            <textarea id="pendulumQuestion" class="tarot-question" rows="2" maxlength="60" placeholder="例如：这件事现在适合推进吗？"></textarea>
+          </div>
+          <button type="button" class="btn btn-primary btn-block" id="btnPendulumAsk">🪀 让灵摆回答</button>
+        </div>
+        <div class="card" id="pendulumResult" style="display:none;">
+          <div class="pendulum-ans" id="pendulumAns"></div>
+          <div class="tarot-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnPendulumAgain">再问一次</button>
+          </div>
+        </div>
+        <div class="card" id="pendulumHistoryCard" style="display:none;">
+          <div class="card-tag">最近的灵摆回答</div>
+          <div id="pendulumHistory"></div>
+        </div>
+      </div>
     </section>
 
     <!-- 页面：命理（八字 + 紫微） -->
@@ -332,6 +446,8 @@
       <div class="subtabs" id="destTabs">
         <button class="subtab active" type="button" data-sub="fate">📿 八字</button>
         <button class="subtab" type="button" data-sub="ziwei">🪐 紫微斗数</button>
+        <button class="subtab" type="button" data-sub="astro">🌞 星盘</button>
+        <button class="subtab" type="button" data-sub="numero">🔢 数字命理</button>
       </div>
       <div id="destFate">
       <div class="page-head">
@@ -391,6 +507,7 @@
           <div class="wu-bars" id="fateWuBars"></div>
         </div>
         <div class="fate-note" id="fateNote"></div>
+        <div class="tarot-actions"><button type="button" class="btn btn-ghost btn-sm" id="btnFateShare">分享</button></div>
         <p class="fate-disclaimer">＊ 以上为趣味算法排盘，节气以公历近似日期估算，仅供自我觉察与放松参考，请勿用于人生重大决策。</p>
       </div>
       </div>
@@ -444,7 +561,88 @@
           <div class="ziwei-board" id="ziweiBoard"></div>
           <div class="ziwei-sihua" id="ziweiSihua"></div>
           <div class="ziwei-legend" id="ziweiLegend"></div>
+          <div class="tarot-actions"><button type="button" class="btn btn-ghost btn-sm" id="btnZiweiShare">分享</button></div>
           <p class="ziwei-disclaimer">＊ 以上为趣味算法排盘，以公历生日近似（忽略精确农历/闰月/节气），仅供自我觉察与放松参考，请勿用于人生重大决策。</p>
+        </div>
+      </div>
+
+      <!-- 子板块：西洋星盘（太阳 / 月亮 / 上升 排盘） -->
+      <div id="destAstro" style="display:none;">
+        <div class="page-head">
+          <h2 class="page-title">🌞 命理 · 西洋星盘</h2>
+        </div>
+        <div class="card">
+          <div class="card-tag">出生信息</div>
+          <p class="upload-hint">填写出生日期、具体时间与出生地（市 + 区），为你排出十行星落座、十二宫位与相位，再做解读。时间的准确度直接决定上升与宫位，越准越接近真实。趣味参考，非专业占星依据。</p>
+          <form id="astroForm" class="music-form">
+            <div class="form-group">
+              <label>出生日期</label>
+              <input type="date" id="astroDate" required>
+            </div>
+            <div class="form-group">
+              <label>出生时间</label>
+              <input type="time" id="astroTime" required>
+              <small class="form-hint">用于推算上升星座与十二宫位</small>
+            </div>
+            <div class="form-two">
+              <div class="form-group">
+                <label>出生城市</label>
+                <select id="astroCity"></select>
+              </div>
+              <div class="form-group">
+                <label>区 / 县</label>
+                <select id="astroDistrict"></select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="btnAstro">排出我的星盘</button>
+          </form>
+        </div>
+        <div class="card astro-result" id="astroResultNatal" style="display:none;">
+          <div class="card-tag">本命星盘</div>
+          <div class="chart-wrap" id="astroWheel"></div>
+          <div class="chart-legend" id="astroLegend"></div>
+          <div class="astro-big3" id="astroBig3"></div>
+          <div class="astro-sec-title">行星落座</div>
+          <div class="astro-table" id="astroPlanets"></div>
+          <div class="astro-sec-title" id="astroAspectTitle">主要相位</div>
+          <div class="astro-aspects" id="astroAspects"></div>
+          <div class="astro-sec-title">解读</div>
+          <div class="astro-readings" id="astroReadings"></div>
+          <div class="tarot-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnAstroSynastry">双人合盘</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnAstroShare">分享</button>
+          </div>
+          <div class="astro-synastry" id="astroSynastry" style="display:none;"></div>
+        </div>
+        <div class="card" id="astroWhistoryCard" style="display:none;">
+          <div class="card-tag">排过的星盘</div>
+          <div id="astroWhistory"></div>
+        </div>
+      </div>
+
+      <!-- 子板块：数字命理 -->
+      <div id="destNumero" style="display:none;">
+        <div class="page-head">
+          <h2 class="page-title">🔢 命理 · 数字命理</h2>
+        </div>
+        <div class="card">
+          <div class="card-tag">生命数字 Life Path</div>
+          <p class="upload-hint">用出生年月日算出你的生命数字，看看这辈子偏爱的节奏与课题。趣味参考。</p>
+          <form id="numeroForm" class="music-form">
+            <div class="form-group">
+              <label>出生日期</label>
+              <input type="date" id="numeroDate" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="btnNumero">算出我的生命数字</button>
+          </form>
+        </div>
+        <div class="card numero-result" id="numeroResult" style="display:none;">
+          <div class="numero-num" id="numeroNum"></div>
+          <div class="numero-name" id="numeroName"></div>
+          <div class="numero-text" id="numeroText"></div>
+          <div class="tarot-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnNumeroShare">分享</button>
+          </div>
         </div>
       </div>
     </section>
