@@ -1,18 +1,18 @@
 :root {
-  --bg: #faf7f2;
+  --bg: #fff5fa;
   --bg-card: #ffffff;
-  --ink: #3a3440;
-  --ink-soft: #8a8394;
-  --ink-faint: #b6afc0;
-  --brand: #c9a5d6;      /* 温柔紫 */
-  --brand-deep: #a67bb8;
-  --brand-soft: #f0e7f5;
-  --accent: #a67bb8;     /* 强调色（经文高亮 / 开关） */
-  --gold: #d4b483;
-  --gold-soft: #f7efe0;
-  --rose: #e0a3b0;
-  --line: #efe9f0;
-  --shadow: 0 6px 24px rgba(160, 120, 180, 0.10);
+  --ink: #6b4a5a;
+  --ink-soft: #a88195;
+  --ink-faint: #d4b3c4;
+  --brand: #ffb3d9;      /* 梦幻粉 */
+  --brand-deep: #ff5e9c;
+  --brand-soft: #ffe3f1;
+  --accent: #ff5e9c;     /* 强调色（经文高亮 / 开关） */
+  --gold: #f7a8cf;
+  --gold-soft: #fde6f0;
+  --rose: #ff9ec0;
+  --line: #ffd9ea;
+  --shadow: 0 6px 24px rgba(255, 122, 176, 0.10);
   --radius: 18px;
   --radius-sm: 12px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -36,7 +36,7 @@ body { padding-bottom: 80px; }
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(250, 247, 242, 0.9);
+  background: rgba(255, 245, 250, 0.9);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
@@ -82,7 +82,7 @@ body { padding-bottom: 80px; }
 
 /* ===== 肯定语 ===== */
 .affirmation-card {
-  background: linear-gradient(135deg, #f7ecf9, #fdf6f1);
+  background: linear-gradient(135deg, #ffe9f3, #fff5fa);
   text-align: center;
 }
 .affirmation-text {
@@ -243,7 +243,7 @@ body { padding-bottom: 80px; }
   background-image: var(--timg);
   background-position: center;
   background-size: cover;
-  background-color: #f6f2fb;
+  background-color: #fff0f7;
   transform: scale(1.06);
   animation: themeZoom 28s ease-in-out infinite alternate;
 }
@@ -287,12 +287,12 @@ body { padding-bottom: 80px; }
   66% { transform: translate(-22px, 24px) scale(0.94); }
 }
 /* 五个主题配图 */
-.theme-love    { --timg: url('../img/love.png');    --torb: rgba(239,154,184,0.45); }
-.theme-wealth  { --timg: url('../img/wealth.png');  --torb: rgba(230,194,110,0.45); }
-.theme-health  { --timg: url('../img/health.png');  --torb: rgba(143,201,163,0.45); }
-.theme-calm    { --timg: url('../img/calm.png');    --torb: rgba(152,174,224,0.45); }
-.theme-career  { --timg: url('../img/career.png');  --torb: rgba(131,191,201,0.45); }
-.theme-default { --timg: url('../img/calm.png');    --torb: rgba(179,157,219,0.45); }
+.theme-love    { --timg: url('../img/love.png');    --torb: rgba(255,158,196,0.5); }
+.theme-wealth  { --timg: url('../img/wealth.png');  --torb: rgba(245,179,212,0.5); }
+.theme-health  { --timg: url('../img/health.png');  --torb: rgba(255,180,210,0.5); }
+.theme-calm    { --timg: url('../img/calm.png');    --torb: rgba(255,170,205,0.5); }
+.theme-career  { --timg: url('../img/career.png');  --torb: rgba(255,190,215,0.5); }
+.theme-default { --timg: url('../img/calm.png');    --torb: rgba(255,150,195,0.5); }
 
 .player-inner { position: relative; z-index: 1; }
 
@@ -306,7 +306,7 @@ body { padding-bottom: 80px; }
   justify-content: center;
   opacity: 0;
   transition: opacity 0.45s ease;
-  background: #f6f2fb;
+  background: #fff0f7;
 }
 .screensaver.show { opacity: 1; }
 .screensaver .theme-bg { inset: 0; opacity: 1; }
@@ -411,7 +411,7 @@ body { padding-bottom: 80px; }
 .tarot-card-wrap.flip { animation: tarotFlip .55s ease; }
 .tarot-down {
   width: 100%; aspect-ratio: 5 / 7; border-radius: 10px; cursor: pointer;
-  background: linear-gradient(150deg, #b89ad0, #8a6fb0);
+  background: linear-gradient(150deg, #ff9ec7, #ff5e9c);
   color: #fff; display: flex; align-items: center; justify-content: center;
   box-shadow: 0 4px 12px rgba(138,111,176,.28); border: 1px solid rgba(255,255,255,.4);
   font-size: 20px;
@@ -450,8 +450,8 @@ body { padding-bottom: 80px; }
 .tarot-deck-card { position: relative; border: none; background: none; padding: 0; cursor: pointer; border-radius: 7px; aspect-ratio: 180 / 300; overflow: hidden; transition: transform .12s ease, box-shadow .12s ease; }
 .tarot-deck-card:hover { transform: translateY(-2px); }
 .tarot-deck-card:active { transform: scale(.94); }
-.tarot-deck-back { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(160deg, #6a4f8f, #4a3568); border: 1px solid #8a6fb0; border-radius: 7px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.12); }
-.tarot-deck-mark { color: #e9c39a; font-size: 15px; opacity: .9; }
+.tarot-deck-back { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(160deg, #d96fa6, #c44f86); border: 1px solid #ff5e9c; border-radius: 7px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.12); }
+.tarot-deck-mark { color: #ffb8d8; font-size: 15px; opacity: .9; }
 .tarot-deck-card.drawn { cursor: default; }
 .tarot-deck-card .tarot-svg { width: 100%; height: auto; display: block; border-radius: 7px; filter: drop-shadow(0 3px 8px rgba(138,111,176,.3)); }
 .tarot-deck-check { position: absolute; top: 3px; right: 3px; width: 17px; height: 17px; line-height: 17px; text-align: center; border-radius: 50%; background: var(--brand-deep); color: #fff; font-size: 11px; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
@@ -636,7 +636,7 @@ body { padding-bottom: 80px; }
   width: 62px; height: 62px; flex: none;
   border: none; border-radius: 50%;
   background: linear-gradient(135deg, var(--brand-soft), var(--gold-soft));
-  box-shadow: 0 4px 14px rgba(166, 123, 184, 0.18);
+  box-shadow: 0 4px 14px rgba(255, 122, 176, 0.18);
   font-size: 30px; line-height: 1;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -753,7 +753,7 @@ body { padding-bottom: 80px; }
     radial-gradient(120% 90% at 15% 0%, rgba(201,165,214,.35), transparent 55%),
     radial-gradient(110% 80% at 100% 30%, rgba(212,180,131,.28), transparent 55%),
     radial-gradient(120% 90% at 40% 110%, rgba(224,163,176,.28), transparent 55%),
-    linear-gradient(160deg, #f7f0fa, #efe6f6 55%, #f9f0e9);
+    linear-gradient(160deg, #ffeef6, #ffdff0 55%, #fff2f8);
   box-shadow: var(--shadow);
 }
 .share-card-top { font-size: 20px; font-weight: 700; color: var(--ink); }
@@ -813,11 +813,11 @@ body { padding-bottom: 80px; }
 .splash {
   position: fixed; inset: 0; z-index: 60;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(160deg, #f3ecf7, #efe6f6 55%, #f9f0e9);
+  background: linear-gradient(160deg, #ffe9f3, #ffdff0 55%, #fff2f8);
   opacity: 1; transition: opacity .6s ease;
 }
 .splash.hide { opacity: 0; pointer-events: none; }
-.splash .theme-bg { inset: 0; opacity: 1; --torb: rgba(179, 157, 219, 0.45); }
+.splash .theme-bg { inset: 0; opacity: 1; --torb: rgba(255, 150, 195, 0.45); }
 .splash-inner {
   position: relative; z-index: 2;
   text-align: center; padding: 0 30px; max-width: 360px; width: 100%;
@@ -841,7 +841,7 @@ body { padding-bottom: 80px; }
   border: none; border-radius: 30px;
   background: linear-gradient(135deg, var(--brand-deep), var(--gold));
   color: #fff; font-size: 17px; font-weight: 700; cursor: pointer;
-  box-shadow: 0 10px 26px rgba(166, 123, 184, .38);
+  box-shadow: 0 10px 26px rgba(255, 122, 176, .38);
   transition: transform .15s ease;
 }
 .splash-enter:active { transform: scale(.97); }
@@ -858,14 +858,14 @@ body { padding-bottom: 80px; }
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 6px 0 14px;
 }
 .astro-die {
-  background: linear-gradient(160deg, #fbf6ff, #f1e8f8);
-  border: 1px solid rgba(166, 123, 184, .25);
+  background: linear-gradient(160deg, #fff0f7, #ffe3f1);
+  border: 1px solid rgba(255, 122, 176, .25);
   border-radius: 16px; padding: 16px 8px; text-align: center;
-  box-shadow: 0 6px 16px rgba(166, 123, 184, .14);
+  box-shadow: 0 6px 16px rgba(255, 122, 176, .14);
 }
 .astro-sym {
   font-size: 34px; line-height: 1; color: var(--brand-deep);
-  text-shadow: 0 2px 8px rgba(166, 123, 184, .3);
+  text-shadow: 0 2px 8px rgba(255, 122, 176, .3);
 }
 .astro-die-name { font-size: 15px; font-weight: 700; color: var(--ink); margin-top: 8px; }
 .astro-die-role { font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
@@ -886,23 +886,23 @@ body { padding-bottom: 80px; }
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0;
 }
 .zi-palace {
-  background: linear-gradient(160deg, #fbf7ff, #f3ecf8);
-  border: 1px solid rgba(166, 123, 184, .22);
+  background: linear-gradient(160deg, #fff5fa, #ffe9f3);
+  border: 1px solid rgba(255, 122, 176, .22);
   border-radius: 14px; padding: 9px 8px; min-height: 94px;
   display: flex; flex-direction: column; gap: 5px;
 }
-.zi-ming { border-color: var(--brand-deep); box-shadow: 0 6px 16px rgba(139, 107, 172, .22); }
+.zi-ming { border-color: var(--brand-deep); box-shadow: 0 6px 16px rgba(232, 90, 147, .22); }
 .zi-palace-head { display: flex; justify-content: space-between; align-items: baseline; }
 .zi-palace-name { font-size: 13px; font-weight: 700; color: var(--brand-deep); }
 .zi-palace-zhi { font-size: 11px; color: var(--ink-faint); }
 .zi-palace-stars { display: flex; flex-wrap: wrap; gap: 4px; }
-.zi-star { font-size: 12px; color: var(--ink); background: rgba(139, 107, 172, .1); border-radius: 8px; padding: 1px 6px; display: inline-flex; align-items: center; gap: 3px; }
+.zi-star { font-size: 12px; color: var(--ink); background: rgba(232, 90, 147, .1); border-radius: 8px; padding: 1px 6px; display: inline-flex; align-items: center; gap: 3px; }
 .zi-empty { color: var(--ink-faint); background: transparent; }
 .zi-sihua { font-style: normal; font-size: 10px; color: #c0392b; font-weight: 700; }
 .zi-palace-desc { font-size: 10.5px; color: var(--ink-faint); line-height: 1.5; margin-top: auto; }
 .zi-sihua-title, .zi-legend-title { font-size: 13px; font-weight: 700; color: var(--brand-deep); margin: 6px 0 8px; }
 .zi-sihua-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.zi-sihua-item { font-size: 12px; color: var(--ink-soft); background: rgba(139, 107, 172, .08); border-radius: 10px; padding: 4px 10px; }
+.zi-sihua-item { font-size: 12px; color: var(--ink-soft); background: rgba(232, 90, 147, .08); border-radius: 10px; padding: 4px 10px; }
 .zi-sihua-item b { color: var(--brand-deep); margin-right: 3px; }
 .zi-legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
 .zi-legend-item { font-size: 11.5px; color: var(--ink-faint); line-height: 1.6; }
@@ -913,48 +913,48 @@ body { padding-bottom: 80px; }
 /* 每日一牌 */
 .daily-card-face { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 4px 4px; }
 .daily-sym { font-size: 56px; line-height: 1; margin-bottom: 8px; }
-.daily-name { font-size: 18px; font-weight: 700; color: var(--brand-deep, #6b5b95); }
+.daily-name { font-size: 18px; font-weight: 700; color: var(--brand-deep, #e85a93); }
 .daily-rev { font-size: 13px; color: var(--ink-faint); font-weight: 500; }
 .daily-meaning { font-size: 14.5px; color: var(--ink-soft); line-height: 1.8; margin-top: 10px; max-width: 92%; }
 .daily-actions, .daily-card .daily-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
 
 /* 经文库 */
 .scripture-lib { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
-.sl-item { background: linear-gradient(160deg, #fbf7ff, #f3ecf8); border: 1px solid rgba(166,123,184,.18); border-radius: 14px; padding: 12px 14px; }
-.sl-title { font-size: 15px; font-weight: 700; color: var(--brand-deep, #6b5b95); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sl-item { background: linear-gradient(160deg, #fff5fa, #ffe9f3); border: 1px solid rgba(166,123,184,.18); border-radius: 14px; padding: 12px 14px; }
+.sl-title { font-size: 15px; font-weight: 700; color: var(--brand-deep, #e85a93); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sl-read { flex: 0 0 auto; }
 .sl-lines { margin-top: 8px; }
 .sl-line { font-size: 14px; color: var(--ink-soft); line-height: 1.85; padding: 2px 0; }
-.sl-line.sr-active { color: var(--accent, #8a7bd8); font-weight: 600; transform: translateX(2px); background: rgba(166,123,184,.08); border-radius: 6px; }
+.sl-line.sr-active { color: var(--accent, #ff7eb0); font-weight: 600; transform: translateX(2px); background: rgba(166,123,184,.08); border-radius: 6px; }
 
 /* 神谕卡 */
 .oracle-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 4px; }
 .oracle-emoji { font-size: 64px; line-height: 1; margin-bottom: 10px; }
-.oracle-name { font-size: 20px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 10px; }
+.oracle-name { font-size: 20px; font-weight: 700; color: var(--brand-deep, #e85a93); margin-bottom: 10px; }
 .oracle-msg { font-size: 15px; color: var(--ink-soft); line-height: 1.9; max-width: 94%; }
 
 /* 卢恩符文 */
 .rune-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 4px; }
-.rune-glyph { font-size: 72px; line-height: 1; color: var(--brand-deep, #6b5b95); margin-bottom: 10px; }
-.rune-name { font-size: 18px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 8px; }
+.rune-glyph { font-size: 72px; line-height: 1; color: var(--brand-deep, #e85a93); margin-bottom: 10px; }
+.rune-name { font-size: 18px; font-weight: 700; color: var(--brand-deep, #e85a93); margin-bottom: 8px; }
 .rune-meaning { font-size: 15px; color: var(--ink); font-weight: 600; margin-bottom: 6px; }
 .rune-advice { font-size: 14px; color: var(--ink-soft); line-height: 1.85; max-width: 94%; }
 
 /* 灵摆 */
 .pendulum-ans { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 4px; }
 .pend-sym { font-size: 56px; line-height: 1; margin-bottom: 8px; }
-.pend-type { font-size: 22px; font-weight: 800; color: var(--brand-deep, #6b5b95); margin-bottom: 10px; }
+.pend-type { font-size: 22px; font-weight: 800; color: var(--brand-deep, #e85a93); margin-bottom: 10px; }
 .pend-msg { font-size: 15px; color: var(--ink-soft); line-height: 1.9; max-width: 94%; }
 
 /* 西洋星盘 / 数字命理 结果 */
-.astro-result .astro-sign, .numero-num { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 6px; }
+.astro-result .astro-sign, .numero-num { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; color: var(--brand-deep, #e85a93); margin-bottom: 6px; }
 .astro-sym { font-size: 30px; }
 .astro-el, .astro-trait, .numero-name { font-size: 14px; color: var(--ink-soft); margin-bottom: 4px; }
 .astro-reading, .numero-text { font-size: 14.5px; color: var(--ink-soft); line-height: 1.9; margin-top: 8px; }
 .numero-num { font-size: 22px; margin-bottom: 10px; }
-.numero-big { font-size: 56px; font-weight: 800; color: var(--brand-deep, #6b5b95); line-height: 1; }
+.numero-big { font-size: 56px; font-weight: 800; color: var(--brand-deep, #e85a93); line-height: 1; }
 .astro-synastry { margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(166,123,184,.3); }
-.syn-title { font-size: 15px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 8px; text-align: center; }
+.syn-title { font-size: 15px; font-weight: 700; color: var(--brand-deep, #e85a93); margin-bottom: 8px; text-align: center; }
 .syn-text { font-size: 14px; color: var(--ink-soft); line-height: 1.85; }
 
 /* 历史记录行 */
@@ -978,7 +978,7 @@ body { padding-bottom: 80px; }
 .astro-readings { margin-top: 4px; }
 .astro-read-block { margin-bottom: 12px; }
 .astro-read-block:last-child { margin-bottom: 0; }
-.arb-h { font-size: 14px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin-bottom: 4px; }
+.arb-h { font-size: 14px; font-weight: 700; color: var(--brand-deep, #e85a93); margin-bottom: 4px; }
 .arb-p { font-size: 14px; color: var(--ink-soft); line-height: 1.9; }
 .form-hint { display: block; margin-top: 5px; font-size: 12px; color: var(--ink-faint); }
 .form-two { display: flex; gap: 10px; }
@@ -991,7 +991,7 @@ body { padding-bottom: 80px; }
 .lg-aspects { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; }
 .lg-a { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ink-faint); }
 .lg-a i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
-.astro-sec-title { font-size: 13px; font-weight: 700; color: var(--brand-deep, #6b5b95); margin: 14px 0 6px; }
+.astro-sec-title { font-size: 13px; font-weight: 700; color: var(--brand-deep, #e85a93); margin: 14px 0 6px; }
 .astro-table { border-top: 1px solid rgba(166,123,184,.12); }
 .pt-head, .pt-row { display: grid; grid-template-columns: 1.15fr 1.15fr .55fr .8fr; gap: 6px; align-items: center; padding: 6px 0; font-size: 13px; }
 .pt-head { font-size: 11.5px; color: var(--ink-faint); border-bottom: 1px solid rgba(166,123,184,.12); }

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#faf7f2">
+  <meta name="theme-color" content="#ffe9f3">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
-  <title>光屿 · 玄学疗愈</title>
+  <title>光屿 · 心灵驿站</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -17,7 +17,7 @@
         <span class="brand-name">光屿</span>
       </div>
       <div class="topbar-actions">
-        <!-- 顶部音频按钮 已删除（小程序版无背景乐） -->
+        <button class="topbar-audio" id="btnSplashToggle" type="button" title="背景旋律" aria-label="背景旋律开关">🔊</button>
         <span class="date-label" id="todayLabel"></span>
       </div>
     </div>
@@ -31,9 +31,11 @@
     <div class="splash-inner">
       <div class="splash-mark">✦</div>
       <h1 class="splash-name">光屿</h1>
-      <p class="splash-sub">玄学疗愈 · 慢下来，照见自己</p>
-      <p class="splash-tip" id="splashTip">轻触进入 🌊</p>
-      <button class="splash-enter" id="btnEnter" type="button">轻触进入光屿</button>
+      <p class="splash-sub">慢下来，照见自己</p>
+      <p class="splash-tip" id="splashTip">轻触进入，让一段旋律接住你 🌊</p>
+      <button class="splash-enter" id="btnEnter" type="button">轻触进入</button>
+      <button class="splash-mute" id="btnSplashMute" type="button">🔇 静音进入</button>
+      <p class="splash-foot">进入即播放背景旋律 · 可随时静音</p>
     </div>
   </div>
 
@@ -41,7 +43,17 @@
   <main class="app">
     <!-- 页面：首页 -->
     <section class="page active" id="page-home">
-      <!-- 今日肯定语卡片 已删除 -->
+      <!-- 今日肯定语卡片 -->
+      <div class="card affirmation-card">
+        <div class="card-tag">今日肯定语</div>
+        <p class="affirmation-text" id="affirmationText">加载中…</p>
+        <p class="affirmation-source" id="affirmationSource" style="display:none;"></p>
+        <div class="affirmation-actions">
+          <button class="btn btn-ghost btn-sm" id="refreshAffirmation">换一条</button>
+          <button class="btn btn-ghost btn-sm" id="saveAffirmation">收藏</button>
+          <button class="btn btn-ghost btn-sm" id="shareAffirmation">分享</button>
+        </div>
+      </div>
 
       <!-- 今日 Tips -->
       <div class="card tip-card">
@@ -65,7 +77,7 @@
       <div class="quick-grid">
         <button class="quick-item" data-nav="wish">
           <span class="quick-icon">🌙</span>
-          <span class="quick-label">许愿</span>
+          <span class="quick-label">手记</span>
         </button>
         <button class="quick-item" data-nav="music">
           <span class="quick-icon">🎧</span>
@@ -74,102 +86,75 @@
       </div>
     </section>
 
-    <!-- 页面：许愿显化 -->
+    <!-- 页面：手记 -->
     <section class="page" id="page-wish">
       <div class="page-head">
         <button class="btn-back" data-nav="home">‹</button>
-        <h2 class="page-title">我的心愿</h2>
-        <button class="btn btn-primary" id="btnNewWish" style="padding:8px 12px;font-size:18px;line-height:1;" title="许下心愿">+</button>
+        <h2 class="page-title">我的手记</h2>
+        <button class="btn btn-primary" id="btnNewWish" style="padding:8px 12px;font-size:18px;line-height:1;" title="写一段手记">+</button>
       </div>
 
       <div class="wish-list" id="wishList"></div>
       <div class="empty-state" id="wishEmpty">
         <p class="empty-icon">🕯️</p>
-        <p>还没有愿望，许下你的第一个心愿吧</p>
+        <p>还没有手记，写下你的第一段想法吧</p>
       </div>
     </section>
 
-    <!-- 页面：定制音乐 -->
+    <!-- 页面：AI 旋律工坊 -->
     <section class="page" id="page-music">
       <div class="page-head">
         <button class="btn-back" data-nav="home">‹</button>
-        <h2 class="page-title">定制音乐</h2>
+        <h2 class="page-title">AI 旋律工坊</h2>
       </div>
       <div class="subtabs" id="musicTabs">
-        <button class="subtab active" type="button" data-sub="custom">🎵 定制</button>
-        <button class="subtab" type="button" data-sub="lib">📚 伴奏库</button>
-        <!-- 经文库子项已删除 -->
+        <button class="subtab active" type="button" data-sub="custom">🎵 AI 生成</button>
+        <button class="subtab" type="button" data-sub="lib">📚 旋律库</button>
       </div>
 
-      <!-- 定制流程 -->
+      <!-- AI 生成（C+D：生日 + 偏好 → bgm-custom/ 本地旋律） -->
       <div id="musicCustom">
       <div class="card">
-        <div class="card-tag">定制你的高能量 Sub</div>
+        <div class="card-tag">按生日生成旋律</div>
+        <p class="upload-hint">基于你的出生月份与音乐偏好，从本地 AI 合成旋律库中匹配一段。仅为音乐风格探索，不构成命理、医疗或情感建议。</p>
         <form id="musicForm" class="music-form">
           <div class="form-group">
-            <label>显化目标</label>
-            <div class="chip-group" id="goalChips">
-              <button type="button" class="chip active" data-goal="爱情">爱情</button>
-              <button type="button" class="chip" data-goal="财富">财富</button>
-              <button type="button" class="chip" data-goal="健康">健康</button>
-              <button type="button" class="chip" data-goal="内在平静">内在平静</button>
-              <button type="button" class="chip" data-goal="事业">事业</button>
+            <label>你的生日</label>
+            <input type="date" id="birthday" class="form-input" max="2025-12-31">
+          </div>
+          <div class="form-group">
+            <label>音乐情绪（想要的感觉）</label>
+            <div class="chip-group" id="moodChips">
+              <button type="button" class="chip active" data-mood="calm">平静</button>
+              <button type="button" class="chip" data-mood="active">活力</button>
+              <button type="button" class="chip" data-mood="sad">忧伤</button>
+              <button type="button" class="chip" data-mood="hope">希望</button>
+              <button type="button" class="chip" data-mood="focus">专注</button>
             </div>
           </div>
           <div class="form-group">
-            <label>愿望提示词（告诉 AI 你想要什么）</label>
-            <textarea id="wishPrompt" rows="2" maxlength="100" placeholder="例如：今年存下 20 万 / 想遇到对的人 / 想睡个好觉… AI 会为你自动匹配目标、风格和特效音"></textarea>
-          </div>
-          <div class="form-group">
-            <label>能量频率</label>
-            <div class="chip-group" id="freqChips">
-              <button type="button" class="chip active" data-freq="432">432 Hz</button>
-              <button type="button" class="chip" data-freq="528">528 Hz</button>
-              <button type="button" class="chip" data-freq="639">639 Hz</button>
-              <button type="button" class="chip" data-freq="741">741 Hz</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>伴奏风格</label>
-            <div class="chip-group" id="styleChips">
-              <button type="button" class="chip active" data-style="auto">AI 自动匹配</button>
-              <button type="button" class="chip" data-style="浪漫流行">浪漫流行</button>
-              <button type="button" class="chip" data-style="轻快民谣">轻快民谣</button>
-              <button type="button" class="chip" data-style="空灵氛围">空灵氛围</button>
-              <button type="button" class="chip" data-style="钢琴叙事">钢琴叙事</button>
-              <button type="button" class="chip" data-style="温暖治愈">温暖治愈</button>
-              <button type="button" class="chip" data-style="清新流行">清新流行</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>氛围特效音（可多选）</label>
-            <div class="chip-group" id="fxChips">
-              <button type="button" class="chip" data-fx="rain">🌧️ 细雨</button>
-              <button type="button" class="chip" data-fx="waves">🌊 海浪</button>
-              <button type="button" class="chip" data-fx="stream">🏞️ 溪流</button>
-              <button type="button" class="chip" data-fx="fire">🔥 篝火</button>
-              <button type="button" class="chip" data-fx="birds">🐦 鸟鸣</button>
-              <button type="button" class="chip" data-fx="chime">🎐 风铃</button>
-              <button type="button" class="chip" data-fx="coins">🪙 金币</button>
+            <label>音色偏好</label>
+            <div class="chip-group" id="toneChips">
+              <button type="button" class="chip active" data-tone="bright">明亮</button>
+              <button type="button" class="chip" data-tone="warm">温润</button>
+              <button type="button" class="chip" data-tone="deep">沉稳</button>
+              <button type="button" class="chip" data-tone="clear">清透</button>
+              <button type="button" class="chip" data-tone="vast">深邃</button>
             </div>
           </div>
           <div class="form-group">
             <label>时长</label>
             <div class="chip-group" id="durChips">
-              <button type="button" class="chip" data-dur="5">5 分钟</button>
-              <button type="button" class="chip active" data-dur="10">10 分钟</button>
-              <button type="button" class="chip" data-dur="15">15 分钟</button>
+              <button type="button" class="chip" data-dur="30">30 秒</button>
+              <button type="button" class="chip active" data-dur="60">1 分钟</button>
+              <button type="button" class="chip" data-dur="180">3 分钟</button>
             </div>
           </div>
           <div class="form-group">
-            <label>给这段音乐取名（可选）</label>
-            <input type="text" id="musicName" placeholder="例如：睡前显化 · 爱情" maxlength="30">
+            <label>给这段旋律取名（可选）</label>
+            <input type="text" id="musicName" placeholder="例如：晨间旋律" maxlength="30">
           </div>
-          <label class="toggle-row" style="display:none;">
-            <input type="checkbox" id="withScripture">
-            <span>📜 加入高能量肯定语（随音乐循环诵读）</span>
-          </label>
-          <button type="submit" class="btn btn-primary btn-block" id="btnGenerate">生成我的定制音乐</button>
+          <button type="submit" class="btn btn-primary btn-block" id="btnGenerate">匹配我的旋律</button>
         </form>
       </div>
 
@@ -181,7 +166,7 @@
         </div>
         <div class="player-inner">
           <div class="player-visual" id="playerVisual" title="点击进入沉浸模式">✦</div>
-          <div class="player-title" id="playerTitle">定制音乐</div>
+          <div class="player-title" id="playerTitle">你的旋律</div>
           <div class="player-sub" id="playerSub"></div>
           <div class="player-controls">
             <button class="btn btn-primary" id="btnPlayPause">播放</button>
@@ -195,36 +180,36 @@
 
       </div><!-- /musicCustom -->
 
-      <!-- 伴奏库（内置免版权曲库 + 我的上传，统一搜索筛选） -->
+      <!-- 旋律库（本地 AI 合成库 + 我的上传） -->
       <div id="musicLib">
       <div class="card">
-        <div class="card-tag">🎵 伴奏库</div>
-        <p class="upload-hint">内置免版权合成曲库，开箱即播、可下载；也能上传你自己的 mp3 当专属伴奏。</p>
+        <div class="card-tag">🎵 旋律库</div>
+        <p class="upload-hint">本地 AI 合成的旋律库（26 首），按情绪 / 音色搜索与试听。也能上传你自己的 mp3 当背景旋律。</p>
         <div class="lib-tools">
-          <input type="text" id="libSearch" class="lib-search" placeholder="搜索曲名 / 标签 / 主题…">
+          <input type="text" id="libSearch" class="lib-search" placeholder="搜索调性 / BPM / 情绪…">
           <div class="chip-group lib-filter" id="libFilterChips">
             <button type="button" class="chip active" data-goal="all">全部</button>
-            <button type="button" class="chip" data-goal="爱情">爱情</button>
-            <button type="button" class="chip" data-goal="财富">财富</button>
-            <button type="button" class="chip" data-goal="健康">健康</button>
-            <button type="button" class="chip" data-goal="内在平静">内在平静</button>
-            <button type="button" class="chip" data-goal="事业">事业</button>
+            <button type="button" class="chip" data-goal="calm">平静</button>
+            <button type="button" class="chip" data-goal="active">活力</button>
+            <button type="button" class="chip" data-goal="sad">忧伤</button>
+            <button type="button" class="chip" data-goal="hope">希望</button>
+            <button type="button" class="chip" data-goal="focus">专注</button>
           </div>
         </div>
         <div class="lib-section">
-          <div class="lib-section-title">✨ 预置曲库</div>
+          <div class="lib-section-title">🎼 AI 旋律库</div>
           <div class="music-list" id="presetList"></div>
         </div>
         <div class="lib-section">
           <div class="lib-section-title">📥 我上传的</div>
           <div class="form-group">
-            <label>上传主题</label>
+            <label>分类</label>
             <div class="chip-group" id="importGoalChips">
-              <button type="button" class="chip active" data-goal="爱情">爱情</button>
-              <button type="button" class="chip" data-goal="财富">财富</button>
-              <button type="button" class="chip" data-goal="健康">健康</button>
-              <button type="button" class="chip" data-goal="内在平静">内在平静</button>
-              <button type="button" class="chip" data-goal="事业">事业</button>
+              <button type="button" class="chip active" data-goal="calm">平静</button>
+              <button type="button" class="chip" data-goal="active">活力</button>
+              <button type="button" class="chip" data-goal="sad">忧伤</button>
+              <button type="button" class="chip" data-goal="hope">希望</button>
+              <button type="button" class="chip" data-goal="focus">专注</button>
             </div>
           </div>
           <button type="button" class="btn btn-ghost btn-block" id="btnImportMusic">＋ 上传音乐文件</button>
@@ -470,7 +455,7 @@
           <span class="fate-v" id="fateStrength"></span>
         </div>
         <div class="fate-elements">
-          <div class="fate-elements-title">五行分布</div>
+          <div class="fate-elements-title">调性偏好分布</div>
           <div class="wu-bars" id="fateWuBars"></div>
         </div>
         <div class="fate-note" id="fateNote"></div>
@@ -658,7 +643,7 @@
 
       <!-- 数据看板 -->
       <div class="card">
-        <div class="card-tag">我的疗愈足迹</div>
+        <div class="card-tag">我的足迹</div>
         <div class="mine-stats" id="mineStats"></div>
       </div>
 
@@ -672,7 +657,7 @@
       <div class="card">
         <div class="card-tag">我的内容</div>
         <div class="mine-subtabs" id="mineSubTabs">
-          <button class="mine-subtab active" type="button" data-arc="wishes">愿望</button>
+          <button class="mine-subtab active" type="button" data-arc="wishes">手记</button>
           <button class="mine-subtab" type="button" data-arc="affirm">收藏肯定语</button>
           <button class="mine-subtab" type="button" data-arc="tarot">塔罗记录</button>
         </div>
@@ -682,23 +667,23 @@
       <!-- 成就分享卡 -->
       <div class="card">
         <div class="card-tag">成就分享卡</div>
-        <p class="upload-hint">把你在光屿的疗愈足迹，生成一张专属卡片，保存或分享给朋友。</p>
+        <p class="upload-hint">把你在光屿的足迹，生成一张总结卡片，保存或分享给朋友。</p>
         <button class="btn btn-primary btn-block" id="btnShareCard" type="button">生成我的光屿卡片</button>
         <div id="mineShareCard" style="display:none;"></div>
       </div>
 
       <!-- 升级 / 真人导师（规划入口） -->
       <div class="card">
-        <div class="card-tag">进阶疗愈</div>
+        <div class="card-tag">更多</div>
         <div class="mine-entry-list">
           <button class="mine-entry" id="entryVip" type="button">
             <span class="mine-entry-icon">👑</span>
-            <span class="mine-entry-txt"><b>光屿会员</b><i>解锁全部频率 · AI 无限对话 · 专属牌阵</i></span>
+            <span class="mine-entry-txt"><b>光屿会员</b><i>AI 无限对话 · 全部牌阵</i></span>
             <span class="mine-entry-tag">规划中</span>
           </button>
           <button class="mine-entry" id="entryMentor" type="button">
             <span class="mine-entry-icon">🕊️</span>
-            <span class="mine-entry-txt"><b>真人疗愈导师</b><i>1v1 对话 · 工作坊 · 定制疗程</i></span>
+            <span class="mine-entry-txt"><b>真人陪伴</b><i>专业对话与倾听</i></span>
             <span class="mine-entry-tag">规划中</span>
           </button>
         </div>
@@ -710,7 +695,7 @@
         <div class="mine-entry-list">
           <button class="mine-entry" id="btnExportData" type="button">
             <span class="mine-entry-icon">📤</span>
-            <span class="mine-entry-txt"><b>导出我的数据</b><i>把愿望、记录备份成 JSON 文件</i></span>
+            <span class="mine-entry-txt"><b>导出我的数据</b><i>把手记、记录备份成 JSON 文件</i></span>
             <span class="mine-entry-arrow">›</span>
           </button>
           <button class="mine-entry" id="btnClearData" type="button">
@@ -737,7 +722,7 @@
     </button>
     <button class="tab-item" data-nav="wish">
       <span class="tab-icon">🌙</span>
-      <span class="tab-label">许愿</span>
+      <span class="tab-label">手记</span>
     </button>
     <button class="tab-item" data-nav="music">
       <span class="tab-icon">🎧</span>
@@ -757,21 +742,21 @@
     </button>
   </nav>
 
-  <!-- 许愿弹窗 -->
+  <!-- 手记弹窗 -->
   <div class="modal" id="wishModal" style="display:none;">
     <div class="modal-mask" data-close="wishModal"></div>
     <div class="modal-body">
       <div class="modal-head">
-        <h3 id="wishModalTitle">许下心愿</h3>
+        <h3 id="wishModalTitle">写一段手记</h3>
         <button class="modal-close" data-close="wishModal">✕</button>
       </div>
       <form id="wishForm">
         <div class="form-group">
-          <label>你的愿望</label>
-          <input type="text" id="wishText" placeholder="例如：今年遇到互相喜欢的人" maxlength="60" required>
+          <label>内容</label>
+          <input type="text" id="wishText" placeholder="例如：今天的小确幸或想法…" maxlength="60" required>
         </div>
         <div class="form-group">
-          <label>愿望分类</label>
+          <label>分类标签</label>
           <div class="chip-group" id="wishCatChips">
             <button type="button" class="chip active" data-cat="爱情">爱情</button>
             <button type="button" class="chip" data-cat="事业">事业</button>
@@ -784,7 +769,7 @@
           <label>期望期限（可选）</label>
           <input type="date" id="wishDeadline">
         </div>
-        <button type="submit" class="btn btn-primary btn-block">保存愿望</button>
+        <button type="submit" class="btn btn-primary btn-block">保存</button>
       </form>
     </div>
   </div>
