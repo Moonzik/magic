@@ -823,8 +823,8 @@
     // harms/hg：谐波结构与相对响度；mode：pluck(拨弦衰减) / sustain(持续带颤音)
     // attack/release：起音与收尾；vibrato：颤音频率(Hz)；breath：气声比例(笛箫类)
     const INSTRUMENTS = {
-      piano:   { type:'sine',     harms:[1,2,3,4,5,6,7],        hg:[1,0.55,0.28,0.14,0.07,0.035,0.02], attack:0.005, release:1.9, mode:'pluck',   vibrato:0, breath:0 },
-      harp:    { type:'sine',     harms:[1,2,3,4,5],             hg:[1,0.42,0.18,0.07,0.03],           attack:0.003, release:1.0, mode:'pluck',   vibrato:0, breath:0 },
+      piano:   { type:'sine',     harms:[1,2,3,4,5,6,7],        hg:[1,0.62,0.38,0.24,0.14,0.085,0.05], attack:0.005, release:1.9, mode:'pluck',   vibrato:0, breath:0 },
+      harp:    { type:'sine',     harms:[1,2,3,4,5],             hg:[1,0.5,0.27,0.14,0.06],            attack:0.003, release:1.0, mode:'pluck',   vibrato:0, breath:0 },
       guitar:  { type:'triangle', harms:[1,2,3,4],               hg:[1,0.45,0.20,0.09],                attack:0.004, release:0.85,mode:'pluck',   vibrato:0, breath:0 },
       guzheng: { type:'triangle', harms:[1,2,3,4,5],             hg:[1,0.50,0.22,0.10,0.04],           attack:0.002, release:0.9, mode:'pluck',   vibrato:0, breath:0 },
       strings: { type:'sine',     harms:[1,2,3,4],               hg:[1,0.32,0.14,0.06],                attack:0.30,  release:2.4, mode:'sustain', vibrato:5, breath:0 },
@@ -1140,7 +1140,7 @@
           // 装饰音更轻、骨干音更有分量，层次更清楚
           const accent = (ev.grace ? 0.45 : 0.68) + rand() * 0.3;
           const pan = (rand() * 2 - 1) * 0.34;
-          playVoice(c, buses.lead, f, t, m.arpVol * accent * hfComp * dyn * 0.92, leadInst, pan, dur * 0.92);
+          playVoice(c, buses.lead, f, t, m.arpVol * accent * hfComp * dyn * 1.5, leadInst, pan, dur * 0.92);
         }
         t += dur;
       });
@@ -1172,7 +1172,7 @@
             while (f > 1000) f /= 2;
             while (f < 130) f *= 2;
             const dyn = dynamicsAt(params, (t - t0) / loopLen, rand);
-            const vol = (m.arpVol || 0.26) * 0.5 * dyn * (0.6 + rand() * 0.5);
+            const vol = (m.arpVol || 0.26) * 0.85 * dyn * (0.6 + rand() * 0.5);
             playVoice(c, buses.pad, f, t, vol, accInst, (rand() * 2 - 1) * 0.4, d * 0.9);
           }
           t += d;
@@ -1203,7 +1203,7 @@
           while (f > 900) f /= 2;
           while (f < 130) f *= 2;
           const dyn = dynamicsAt(params, (t - t0) / loopLen, rand);
-          const vol = 0.12 * dyn * (0.75 + rand() * 0.5);
+          const vol = 0.2 * dyn * (0.75 + rand() * 0.5);
           playVoice(c, buses.lead, f, t, vol, cInst, (rand() * 2 - 1) * 0.35, dur * 1.3);
         }
         t += dur;
@@ -1233,7 +1233,7 @@
           const panner = c.createStereoPanner();
           panner.pan.value = (k % 2 ? 0.3 : -0.3);
           panner.connect(buses.pad);
-          padNote(c, panner, f, t1, t2, m.padVol * dyn, m.padType);
+          padNote(c, panner, f, t1, t2, m.padVol * 0.55 * dyn, m.padType);
         });
       });
       // 主旋律 / 自动伴奏 / 自动和声（都带不规则节奏、转调与情绪起伏）
@@ -1251,12 +1251,12 @@
 
       const master = c.createGain();
       master.gain.setValueAtTime(0.0001, t);
-      master.gain.exponentialRampToValueAtTime(0.66, t + 3); // 3 秒整体淡入，柔和开场不突兀
+      master.gain.exponentialRampToValueAtTime(0.74, t + 3); // 3 秒整体淡入，柔和开场不突兀
 
       const comp = c.createDynamicsCompressor();
-      comp.threshold.value = -12;
-      comp.knee.value = 18;
-      comp.ratio.value = 6;
+      comp.threshold.value = -8;
+      comp.knee.value = 20;
+      comp.ratio.value = 4;
       comp.attack.value = 0.01;
       comp.release.value = 0.28;
       master.connect(comp);
@@ -1266,8 +1266,8 @@
       const lead = c.createGain(); lead.gain.value = 1;
 
       // 柔化高频：给伴奏总线加低通，滤掉刺耳的泛音毛刺，让音色更温暖耐听
-      const padLP = c.createBiquadFilter(); padLP.type = 'lowpass'; padLP.frequency.value = 900;
-      const leadLP = c.createBiquadFilter(); leadLP.type = 'lowpass'; leadLP.frequency.value = 1800;
+      const padLP = c.createBiquadFilter(); padLP.type = 'lowpass'; padLP.frequency.value = 1100;
+      const leadLP = c.createBiquadFilter(); leadLP.type = 'lowpass'; leadLP.frequency.value = 4200;
       pad.connect(padLP); padLP.connect(master);
       lead.connect(leadLP); leadLP.connect(master);
 
