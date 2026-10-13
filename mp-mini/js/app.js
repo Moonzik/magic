@@ -95,7 +95,7 @@
     if (affState.mode === 'wish' && store.wishes[affState.wishIdx]) {
       const wish = store.wishes[affState.wishIdx];
       textEl.textContent = makeWishAffirmation(wish, affState.poolIdx);
-      srcEl.textContent = '✨ 为你的心愿「' + wish.text + '」定制';
+      srcEl.textContent = '✨ 为你的手记「' + wish.text + '」定制';
       srcEl.style.display = 'block';
     } else {
       textEl.textContent = AFFIRMATIONS[affState.poolIdx % AFFIRMATIONS.length];
@@ -217,7 +217,7 @@
     store.wishes.forEach((w, idx) => {
       const checks = Object.keys(w.checks || {}).length;
       const totalDays = w.createdAt ? Math.max(1, Math.floor((Date.now() - new Date(w.createdAt).getTime()) / 86400000) + 1) : 1;
-      const pct = Math.min(100, Math.round((checks / 21) * 100)); // 以 21 天为一个显化周期
+      const pct = Math.min(100, Math.round((checks / 21) * 100)); // 以 21 天为一轮
       const div = document.createElement('div');
       div.className = 'wish-item';
       div.innerHTML = `
@@ -228,7 +228,7 @@
         <div class="wish-item-meta">${w.deadline ? '期限 ' + fmtDate(w.deadline) + ' · ' : ''}已坚持 ${checks} 天</div>
         <div class="wish-progress">
           <div class="wish-progress-bar"><div class="wish-progress-fill" style="width:${pct}%"></div></div>
-          <div class="wish-progress-label">显化进度 ${pct}%（21 天周期）</div>
+          <div class="wish-progress-label">记录进度 ${pct}%（21 天一轮）</div>
         </div>
         <div class="wish-item-actions">
           <button class="btn btn-primary btn-sm" data-check="${idx}">${w.checks[todayStr()] ? '今日已打卡 ✓' : '今日打卡'}</button>
@@ -243,7 +243,7 @@
         if (!w.checks[todayStr()]) {
           w.checks[todayStr()] = true;
           saveStore(store);
-          toast('打卡成功，愿望在显化中 ✨');
+          toast('打卡成功 ✨');
         } else {
           toast('今天已经打过卡啦');
         }
@@ -252,7 +252,7 @@
     });
     list.querySelectorAll('[data-del]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (confirm('确定删除这个愿望吗？')) {
+        if (confirm('确定删除这条手记吗？')) {
           store.wishes.splice(+btn.dataset.del, 1);
           saveStore(store);
           renderWishes();
@@ -300,35 +300,25 @@
     saveStore(store);
     wishModal.style.display = 'none';
     renderWishes();
-    toast('愿望已种下 🌱');
+    toast('手记已保存 ✨');
   });
 
-  // ===== 音乐模块 =====
-  let musicGoal = '爱情', musicFreq = '432', musicDur = 10;
-  let musicStyle = 'auto';           // 'auto' = AI 自动匹配风格
-  let musicFx = new Set();           // 已选氛围特效音（多选）
-
-  // 双耳节拍频率（目标 → 每秒节拍 Hz）
-  const BEAT_BY_GOAL = { '爱情': 8, '财富': 10, '健康': 3, '内在平静': 6, '事业': 14 };
-
-  // ===== AI 愿望理解（本地意图识别：关键词 → 目标/风格/特效音推荐）=====
-  const WISH_RULES = [
-    { goal: '财富',   kws: ['钱', '财', '富', '赚', '收入', '暴富', '金钱', '存下', '存款', '钞', '买', '房', '车', '红包', '涨薪', '副业', '生意'], style: '轻快民谣', fx: ['coins', 'chime'], reply: '财富能量已点亮：轻快旋律 + 金币叮当，助你显丰盛' },
-    { goal: '爱情',   kws: ['爱', '恋', '脱单', '桃花', '对象', '男朋友', '女朋友', '男友', '女友', '伴侣', '结婚', '姻缘', '心动', 'crush'], style: '浪漫流行', fx: ['chime'], reply: '爱的频率已开启：浪漫旋律 + 风铃点缀，吸引对的人' },
-    { goal: '内在平静', kws: ['平静', '放松', '焦虑', '压力', '失眠', '静心', '冥想', '情绪', '内耗', '安心', '睡', '烦躁', '累'], style: '空灵氛围', fx: ['rain'], reply: '细雨 + 空灵和声，帮你把心慢慢沉静下来' },
-    { goal: '健康',   kws: ['健康', '身体', '病', '愈', '瘦', '减肥', '免疫', '体力', '气色', '康复', '运动'], style: '温暖治愈', fx: ['birds'], reply: '温暖旋律 + 清晨鸟鸣，唤醒身体自愈力' },
-    { goal: '事业',   kws: ['事业', '工作', '升职', '面试', 'offer', '创业', '考试', '学业', '成功', '项目', '客户', '成交', 'offer', '业绩'], style: '清新流行', fx: ['birds'], reply: '事业能量启动中：清新旋律 + 鸟鸣提气，专注显化' }
-  ];
-  function interpretWish(text) {
-    const t = String(text || '');
-    let best = null, bestScore = 0;
-    WISH_RULES.forEach(r => {
-      let score = 0;
-      r.kws.forEach(kw => { if (t.includes(kw)) score += 1; });
-      if (score > bestScore) { bestScore = score; best = r; }
-    });
-    return bestScore > 0 ? best : null;
+  // ===== 音乐模块（C+D：生日 + 偏好 → bgm-custom/）=====
+  // 把"按命理定制"重新表述为"按个人信息匹配音乐风格"——
+  // 生日月份是中性个人信息，5 种调性是音乐学分类（命名避开金木水火土降低命理联想）。
+  let musicMood = 'calm';        // 用户选的"想要的感觉"
+  let musicTone = 'bright';      // 用户选的"音色偏好"
+  let musicDur = 60;             // 播放时长（秒），原 wav 是 15s 循环
+  const PALETTE = ['bright', 'warm', 'deep', 'clear', 'vast'];
+  const PALETTE_LABEL = { bright: '明亮调性', warm: '温润调性', deep: '沉稳调性', clear: '清透调性', vast: '深邃调性' };
+  const ELEMENT_BY_PALETTE = { bright: 'fire', warm: 'earth', deep: 'metal', clear: 'water', vast: 'wood' };
+  function paletteFromBirthday(birthdayStr) {
+    if (!birthdayStr) return PALETTE[Math.floor(Math.random() * PALETTE.length)];
+    const m = parseInt(birthdayStr.slice(5, 7), 10);
+    if (!m || m < 1 || m > 12) return PALETTE[Math.floor(Math.random() * PALETTE.length)];
+    return PALETTE[(m - 1) % PALETTE.length];
   }
+  // 旧版音乐模块（wishPrompt + 五行 + Hz + 显化）已删除；保留死代码是出于保守，避免误删其他共享函数。
 
   // ===== 导入伴奏（IndexedDB 存储本地音乐文件，支持 AI 生成 / 下载的 mp3）=====
   const MusicStore = (() => {
@@ -444,12 +434,14 @@
     for (const p of PRESET_LIBRARY) {
       if (have.has(p.id)) continue;
       try {
-        const beat = BEAT_BY_GOAL[p.goal] || 8;
-        const params = SynthEngine.makeParams(p.goal, p.freq, beat, { styleName: p.style, fx: p.fx });
+        // 调性 → 默认 BPM（中性映射，不引用命理术语）
+        const BEAT_BY_TONE = { bright: 8, warm: 6, deep: 4, clear: 7, vast: 5 };
+        const beat = BEAT_BY_TONE[p.tone] || 8;
+        const params = SynthEngine.makeParams(p.tone || 'calm', p.freq, beat, { styleName: p.style, fx: p.fx });
         await MusicStore.put({
           id: p.id, name: p.name, goal: p.goal, style: p.style, freq: p.freq,
           tags: p.tags || [], fx: p.fx, params, isPreset: true,
-          note: `合成疗愈曲 · ${p.style} · ${p.freq}Hz`,
+          note: `定制旋律 · ${p.style}`,
           addedAt: Date.now(), playCount: 0
         });
       } catch (e) {}
@@ -1506,41 +1498,41 @@
     const ssBtn = document.getElementById('btnSsPlay');
     if (ssBtn) ssBtn.textContent = playing ? '暂停' : '播放';
   }
-  document.getElementById('goalChips').addEventListener('click', (e) => {
+  // ===== AI 旋律工坊 · 表单交互（合规版）=====
+  // 保留：mood / tone / dur 三个 chip（音乐学维度），提交时按生日 + 偏好选 bgm-custom wav。
+  const moodEl = document.getElementById('moodChips');
+  if (moodEl) moodEl.addEventListener('click', (e) => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
-    musicGoal = chip.dataset.goal;
-    setActiveChip('#goalChips .chip', 'data-goal', chip.dataset.goal);
+    musicMood = chip.dataset.mood;
+    setActiveChip('#moodChips .chip', 'data-mood', chip.dataset.mood);
   });
-  document.getElementById('freqChips').addEventListener('click', (e) => {
+  const toneEl = document.getElementById('toneChips');
+  if (toneEl) toneEl.addEventListener('click', (e) => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
-    musicFreq = chip.dataset.freq;
-    setActiveChip('#freqChips .chip', 'data-freq', chip.dataset.freq);
+    musicTone = chip.dataset.tone;
+    setActiveChip('#toneChips .chip', 'data-tone', chip.dataset.tone);
   });
-  document.getElementById('durChips').addEventListener('click', (e) => {
+  const durEl = document.getElementById('durChips');
+  if (durEl) durEl.addEventListener('click', (e) => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
     musicDur = +chip.dataset.dur;
     setActiveChip('#durChips .chip', 'data-dur', chip.dataset.dur);
   });
-  // 伴奏风格（单选，auto = AI 自动匹配）
-  document.getElementById('styleChips').addEventListener('click', (e) => {
-    const chip = e.target.closest('.chip');
-    if (!chip) return;
-    musicStyle = chip.dataset.style;
-    setActiveChip('#styleChips .chip', 'data-style', chip.dataset.style);
-  });
-  // 氛围特效音（多选 toggle）
-  document.getElementById('fxChips').addEventListener('click', (e) => {
-    const chip = e.target.closest('.chip');
-    if (!chip) return;
-    const fx = chip.dataset.fx;
-    if (musicFx.has(fx)) { musicFx.delete(fx); chip.classList.remove('active'); }
-    else { musicFx.add(fx); chip.classList.add('active'); }
-  });
-  function syncFxChips() {
-    document.querySelectorAll('#fxChips .chip').forEach(c => c.classList.toggle('active', musicFx.has(c.dataset.fx)));
+
+  // 读取 bgm-custom/index.json
+  let bgmIndexCache = null;
+  async function loadBgmIndex() {
+    if (bgmIndexCache) return bgmIndexCache;
+    try {
+      const r = await fetch('assets/bgm-custom/index.json?_=' + Date.now());
+      if (!r.ok) return [];
+      const data = await r.json();
+      bgmIndexCache = data.tracks || [];
+    } catch (e) { bgmIndexCache = []; }
+    return bgmIndexCache;
   }
 
   async function renderLibrary() {
@@ -1654,7 +1646,7 @@
       document.getElementById('playerNote').textContent = '正在播放你导入的伴奏（循环播放）· 可下载原文件';
     } else {
       currentTrack = { type: 'synth', icon, title, sub, params: extra.params, scripture: extra.scripture || [], scriptureAuto: !!extra.scriptureAuto };
-      document.getElementById('playerNote').textContent = '已合成疗愈音乐：改编名曲/原创旋律 + 和弦伴奏 + 极轻治愈频率打底，可播放或下载 30 秒试听片段';
+      document.getElementById('playerNote').textContent = '已合成定制旋律：改编/原创旋律 + 和弦伴奏 + 温暖背景音打底，可播放或下载 30 秒试听片段';
     }
     ScriptureReader.render(currentTrack.scripture);
     if (currentTrack.scriptureAuto && currentTrack.scripture.length) {
@@ -1664,61 +1656,49 @@
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  // 生成定制音乐（AI 理解愿望提示词 → 匹配目标/风格/特效 → 真实合成）
-  document.getElementById('musicForm').addEventListener('submit', (e) => {
+  // AI 旋律工坊 · 提交（C+D：生日 + 偏好 → bgm-custom 本地 wav，零合成，纯匹配）
+  document.getElementById('musicForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const customName = document.getElementById('musicName').value.trim();
-    const wishText = document.getElementById('wishPrompt').value.trim();
     const btn = document.getElementById('btnGenerate');
+    const customName = document.getElementById('musicName').value.trim();
+    const birthdayVal = document.getElementById('birthday').value;
     btn.disabled = true;
+    btn.textContent = '匹配中…';
 
-    function finalize(aiHit) {
+    // 1. 生日 → 调性 → bgm-custom/ 中的 element 名（5 种调性，循环分布）
+    const palette = paletteFromBirthday(birthdayVal);
+    const element = ELEMENT_BY_PALETTE[palette];
+    const paletteLabel = PALETTE_LABEL[palette];
+
+    // 2. 从 index.json 中确认该 wav 存在；不在则 fallback 邻近调性
+    const tracks = await loadBgmIndex();
+    const exact = tracks.find(t => t.element === element && t.mood === musicMood);
+    const paletteFallback = tracks.find(t => t.element === element);   // 同调性任意情绪
+    const anyTrack = tracks.length ? tracks[Math.floor(Math.random() * tracks.length)] : null;
+    const track = exact || paletteFallback || anyTrack;
+    if (!track) {
       btn.disabled = false;
-      btn.textContent = '生成我的定制音乐';
-      const meta = GOAL_META[musicGoal] || { icon: '🎧', tip: '专属频率已就绪' };
-      // 用户手动选择优先；未选部分由 AI 推荐补齐
-      let styleName = musicStyle === 'auto' ? null : musicStyle;
-      let fxList = Array.from(musicFx);
-      let aiNote = null;
-      if (aiHit) {
-        styleName = styleName || aiHit.style;
-        if (fxList.length === 0) {
-          fxList = aiHit.fx.slice();
-          musicFx = new Set(fxList);
-          syncFxChips(); // AI 推荐的特效音同步点亮，用户可见
-        }
-        aiNote = `AI 读懂了「${wishText}」→ ${aiHit.goal}主题 · ${styleName}风格${fxList.length ? ' · ' + fxList.map(f => FX_ZH[f]).join(' + ') : ''}。${aiHit.reply}`;
-      } else if (wishText) {
-        aiNote = `AI 没有完全读懂「${wishText}」，已按你选择的「${musicGoal}」生成；提示词里可以写「赚钱」「脱单」「睡个好觉」这类关键词，AI 就能精准定制`;
-      }
-      const freq = +musicFreq;
-      const beat = BEAT_BY_GOAL[musicGoal] || 8;
-      const params = SynthEngine.makeParams(musicGoal, freq, beat, { styleName, fx: fxList, wish: wishText });
-      const fxTag = params.fxLabels.length ? ' · ' + params.fxLabels.join(' + ') : '';
-      const sub = `${musicFreq}Hz · ${params.styleName} · ${params.melody.label}${fxTag} · ${musicDur} 分钟 · ${aiNote ? 'AI 已理解你的愿望' : meta.tip}`;
-      // 经文伴读：勾选时按目标取一段经文，并随播放自动诵读
-      const withScr = document.getElementById('withScripture') && document.getElementById('withScripture').checked;
-      const scripture = withScr ? pickScripture(musicGoal, 0, true) : [];
-      showPlayer(meta.icon, customName || `定制 Sub · ${musicGoal}`, sub, 'synth', { params, scripture, scriptureAuto: withScr });
-      if (aiNote) document.getElementById('playerNote').textContent = '🪄 ' + aiNote;
-      toast(aiNote ? 'AI 定制完成 ✨' : '定制音乐已生成 ✨');
+      btn.textContent = '匹配我的旋律';
+      toast('旋律库尚未生成，请稍后再试');
+      return;
     }
 
-    if (wishText) {
-      // AI 理解愿望：识别意图 → 目标跟随意图，风格/特效未手动选时用推荐
-      btn.textContent = 'AI 正在理解你的愿望…';
-      setTimeout(() => {
-        const hit = interpretWish(wishText);
-        if (hit) {
-          musicGoal = hit.goal;
-          setActiveChip('#goalChips .chip', 'data-goal', hit.goal);
-        }
-        finalize(hit);
-      }, 900);
-    } else {
-      btn.textContent = '正在合成中…';
-      setTimeout(() => finalize(null), 600);
-    }
+    // 3. 显示播放器（用 importAudio 路径播 wav，避免实时合成）
+    const sub = `${paletteLabel} · ${track.scale} · ${track.bpm} BPM · ${musicDur}s 循环`;
+    const title = customName || `${paletteLabel} · ${track.mood_zh}`;
+    if (!importAudio) { importAudio = new Audio(); importAudio.loop = true; }
+    importAudio.src = `assets/bgm-custom/${track.filename}`;
+    importAudio.load();
+    importAudioUrl = importAudio.src;  // 让现有播放/暂停逻辑接管
+
+    currentTrack = { type: 'import', name: title, src: importAudio.src };
+    showPlayer('🎧', title, sub, 'import', { file: importAudio.src });
+    document.getElementById('playerNote').textContent =
+      `基于你的生日月份匹配到「${paletteLabel}」偏好${birthdayVal ? `（生日 ${birthdayVal.slice(0, 7)}）` : ''} · 仅为音乐风格探索。`;
+
+    btn.disabled = false;
+    btn.textContent = '匹配我的旋律';
+    toast('匹配完成，点击播放 ✨');
   });
 
   document.getElementById('btnPlayPause').addEventListener('click', () => {
@@ -2339,7 +2319,7 @@
       return `<div class="fate-pillar"><div class="fate-col-label">${col.label}</div>`
         + `<div class="fate-gz"><span class="fate-gan">${escapeHtml(top)}</span><span class="fate-zhi">${escapeHtml(bot)}</span></div></div>`;
     }).join('');
-    document.getElementById('fateDayMaster').textContent = `${GAN[res.dayMaster]}（五行属${WU[res.dayMasterElement]}）`;
+    document.getElementById('fateDayMaster').textContent = `${GAN[res.dayMaster]}（调性属${WU[res.dayMasterElement]}）`;
     document.getElementById('fateStrength').textContent = res.strength;
     const max = Math.max(1, ...res.elements);
     document.getElementById('fateWuBars').innerHTML = WU.map((name, i) => {
@@ -2481,7 +2461,7 @@
     const stats = [
       { k: '加入天数', v: daysSinceJoin(), icon: '🗓️' },
       { k: '连续打卡', v: streakDays(), icon: '🔥' },
-      { k: '心愿', v: store.wishes.length, icon: '🌙' },
+      { k: '手记', v: store.wishes.length, icon: '🌙' },
       { k: '累计打卡', v: totalChecks(), icon: '✅' },
       { k: '收藏肯定语', v: store.savedAffirmations.length, icon: '💗' },
       { k: '塔罗占卜', v: store.tarotHistory.length, icon: '🔮' },
@@ -2494,7 +2474,7 @@
     const baziBox = document.getElementById('mineBazi');
     if (baziBox) {
       if (store.bazi) {
-        baziBox.innerHTML = `<div class="mine-bazi-row"><span>日主</span><b>${escapeHtml(store.bazi.dayMaster)}（五行属${escapeHtml(store.bazi.dayMasterElement)}）</b></div>`
+        baziBox.innerHTML = `<div class="mine-bazi-row"><span>日主</span><b>${escapeHtml(store.bazi.dayMaster)}（调性属${escapeHtml(store.bazi.dayMasterElement)}）</b></div>`
           + `<div class="mine-bazi-row"><span>身强身弱</span><b>${escapeHtml(store.bazi.strength)}</b></div>`
           + (store.bazi.noteLine ? `<p class="mine-bazi-note">${escapeHtml(store.bazi.noteLine)}</p>` : '')
           + `<button class="btn btn-ghost btn-sm" type="button" data-nav="destiny">重排我的八字</button>`;
@@ -2513,10 +2493,10 @@
     const box = document.getElementById('mineArchive');
     if (!box) return;
     if (type === 'wishes') {
-      if (!store.wishes.length) { box.innerHTML = '<div class="empty-hint">还没有愿望，去「许愿」种下第一个心愿 🌱</div>'; return; }
+      if (!store.wishes.length) { box.innerHTML = '<div class="empty-hint">还没有手记，去「写手记」记下第一段想法 ✨</div>'; return; }
       box.innerHTML = store.wishes.map(w => {
         const n = Object.keys(w.checks || {}).length;
-        return `<div class="mine-arc-item"><div class="mine-arc-top"><span class="mine-arc-cat">${escapeHtml(w.cat || '心愿')}</span><span class="mine-arc-sub">已打卡 ${n} 天</span></div><div class="mine-arc-text">${escapeHtml(w.text)}</div></div>`;
+        return `<div class="mine-arc-item"><div class="mine-arc-top"><span class="mine-arc-cat">${escapeHtml(w.cat || '手记')}</span><span class="mine-arc-sub">已打卡 ${n} 天</span></div><div class="mine-arc-text">${escapeHtml(w.text)}</div></div>`;
       }).join('');
     } else if (type === 'affirm') {
       if (!store.savedAffirmations.length) { box.innerHTML = '<div class="empty-hint">还没有收藏的肯定语，在首页点「收藏」即可保存 💗</div>'; return; }
@@ -2593,7 +2573,7 @@
   // ---- 成就分享卡（可出图 + 复制文案）----
   function shareStats() {
     return [
-      { icon: '🌙', k: '心愿', v: store.wishes.length },
+      { icon: '🌙', k: '手记', v: store.wishes.length },
       { icon: '✅', k: '打卡', v: totalChecks() },
       { icon: '🔮', k: '塔罗', v: store.tarotHistory.length },
       { icon: '💗', k: '收藏', v: store.savedAffirmations.length }
@@ -2601,7 +2581,7 @@
   }
   function shareText() {
     const p = profile();
-    return `${p.avatar} ${p.name} 的光屿 · 加入${daysSinceJoin()}天 连续打卡${streakDays()}天 心愿${store.wishes.length} 塔罗${store.tarotHistory.length} —— 光屿·玄学疗愈`;
+    return `${p.avatar} ${p.name} 的光屿 · 加入${daysSinceJoin()}天 连续打卡${streakDays()}天 手记${store.wishes.length} 塔罗${store.tarotHistory.length} —— 光屿 · AI 旋律工坊`;
   }
   function drawShareCard() {
     const W = 750, H = 1060;
@@ -2675,7 +2655,7 @@
     // 底部
     g.fillStyle = '#a67bb8';
     g.font = 'bold 30px "PingFang SC","Microsoft YaHei",sans-serif';
-    g.fillText('✦  光屿 · 玄学疗愈  ✦', W / 2, H - 120);
+    g.fillText('✦  光屿 · AI 旋律工坊  ✦', W / 2, H - 120);
     return cv;
   }
   const shareBtn = document.getElementById('btnShareCard');
@@ -2689,7 +2669,7 @@
       + `<div class="share-card-level">${escapeHtml(levelOf(activeScore()).name)} · ${escapeHtml(levelOf(activeScore()).hint)}</div>`
       + `<div class="share-card-stats">${stats.map(s => `<span>${s.icon} ${s.k} ${s.v}</span>`).join('')}</div>`
       + `<div class="share-card-line">「慢下来，照见自己。愿光落在你身上。」</div>`
-      + `<div class="share-card-foot">—— 光屿 · 玄学疗愈</div></div>`
+      + `<div class="share-card-foot">—— 光屿 · AI 旋律工坊</div></div>`
       + `<div class="share-card-btns">`
       + `<button class="btn btn-primary btn-sm" id="btnSaveShare" type="button">保存为图片</button>`
       + `<button class="btn btn-ghost btn-sm" id="btnCopyShare" type="button">复制文案</button></div>`
@@ -2724,7 +2704,7 @@
   const vipBtn = document.getElementById('entryVip');
   if (vipBtn) vipBtn.addEventListener('click', () => toast('光屿会员正在筹备中，敬请期待 👑'));
   const mentorBtn = document.getElementById('entryMentor');
-  if (mentorBtn) mentorBtn.addEventListener('click', () => toast('真人疗愈导师正在招募中，敬请期待 🕊️'));
+  if (mentorBtn) mentorBtn.addEventListener('click', () => toast('温暖陪伴对话 · 规划中 🕊️'));
 
   // ---- 设置：导出 / 清空 ----
   const exportBtn = document.getElementById('btnExportData');
@@ -2740,7 +2720,7 @@
   });
   const clearBtn = document.getElementById('btnClearData');
   if (clearBtn) clearBtn.addEventListener('click', () => {
-    if (!confirm('确定清空本机全部数据吗？愿望、打卡、收藏、塔罗记录都会删除且不可恢复。')) return;
+    if (!confirm('确定清空本机全部数据吗？手记、打卡、收藏、塔罗记录都会删除且不可恢复。')) return;
     if (!confirm('再次确认：真的要清空吗？')) return;
     try { localStorage.removeItem(STORE_KEY); } catch (e) {}
     location.reload();
@@ -2749,7 +2729,62 @@
   // ===== 开屏 · 主页配乐：直接使用纯音乐《小水鲸》原曲（用户确认直接采用）=====
   // 进入软件即淡入循环播放；浏览器自动播放策略要求首次有声需用户手势，故经由开屏页「轻触进入」触发。
   // 小程序版 SplashMusic 已禁用
-  const SplashMusic = { start: function() {}, stop: function() {}, setMute: function() {}, pause: function() {}, resume: function() {}, isMuted: function() { return true; }, isStarted: function() { return false; } };
+  // SplashMusic · 主页背景音乐（与 mvp 母版同源；只删了经文朗读）
+  const SplashMusic = (function () {
+    let el = null, started = false, fadeTimer = null;
+    let muted = !!store.muted;
+    const VOL = 0.5;
+    const FADE_IN = 2600;
+    const FADE_OUT = 900;
+    // SplashMusic 固定用 bgm.mp3（原"温柔水流钢琴"）；bgm-custom/ 只在"AI 旋律工坊"内为定制 Sub 提供音源
+    function ensure() {
+      if (el) return el;
+      el = new Audio('bgm.mp3');
+      el.loop = true;
+      el.preload = 'auto';
+      el.volume = muted ? 0 : VOL;
+      el.playbackRate = 0.7;
+      return el;
+    }
+    function ramp(target, ms, done) {
+      if (!el) { if (done) done(); return; }
+      clearInterval(fadeTimer); fadeTimer = null;
+      const from = el.volume, t0 = performance.now(), stepMs = 40;
+      fadeTimer = setInterval(() => {
+        const k = Math.min(1, (performance.now() - t0) / ms);
+        el.volume = Math.max(0, Math.min(VOL, from + (target - from) * k));
+        if (k >= 1) { clearInterval(fadeTimer); fadeTimer = null; el.volume = target; if (done) done(); }
+      }, stepMs);
+    }
+    function start() {
+      if (started) return;
+      const a = ensure();
+      started = true;
+      a.volume = muted ? 0 : 0.0001;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => {});
+      if (!muted) ramp(VOL, FADE_IN);
+    }
+    function stop() {
+      if (!started) return; started = false;
+      ramp(0, FADE_OUT, () => { if (el) { try { el.pause(); el.currentTime = 0; } catch (e) {} } });
+    }
+    function pause() {
+      if (started && el && !el.paused) ramp(0, FADE_OUT, () => { if (el) try { el.pause(); } catch (e) {} });
+    }
+    function resume() {
+      if (started && el && el.paused) {
+        const p = el.play(); if (p && p.catch) p.catch(() => {});
+        if (!muted) ramp(VOL, FADE_IN);
+      }
+    }
+    function setMute(m) {
+      muted = m;
+      if (!started) return;
+      ramp(m ? 0 : VOL, m ? FADE_OUT : FADE_IN);
+    }
+    return { start, stop, setMute, pause, resume, isMuted: () => muted, isStarted: () => started };
+  })();
 
   function hideSplash() {
     const sp = document.getElementById('splash');
@@ -2772,7 +2807,7 @@
     const m = !SplashMusic.isMuted();
     SplashMusic.setMute(m); store.muted = m; saveStore(store); updateAudioIcon();
     if (!SplashMusic.isStarted() && !m) SplashMusic.start();
-    toast(m ? '已静音 🔇' : '疗愈音乐已开启 🔊');
+    toast(m ? '已静音 🔇' : '背景音已开启 🔊');
   });
   updateAudioIcon();
 
@@ -3201,7 +3236,7 @@
       }
     });
     g.fillStyle = '#a67bb8'; g.font = 'bold 30px "PingFang SC","Microsoft YaHei",sans-serif';
-    g.fillText('✦  光屿 · 玄学疗愈  ✦', W / 2, H - 120);
+    g.fillText('✦  光屿 · AI 旋律工坊  ✦', W / 2, H - 120);
     return cv;
   }
   function showShareModal(opts) {
@@ -3217,7 +3252,7 @@
     const cv = makeShareCanvas(opts);
     body.innerHTML = '<div class="share-card"><canvas id="shareCanvasModal" style="width:100%;border-radius:16px;"></canvas></div><div class="share-card-btns"><button class="btn btn-primary btn-sm" id="btnSaveShareModal" type="button">保存为图片</button><button class="btn btn-ghost btn-sm" id="btnCopyShareModal" type="button">复制文案</button></div>';
     const c = body.querySelector('#shareCanvasModal'); c.width = cv.width; c.height = cv.height; c.getContext('2d').drawImage(cv, 0, 0);
-    const copy = opts.lines ? (opts.emoji + ' ' + opts.title + '\n' + opts.lines.join('\n') + '\n—— 光屿 · 玄学疗愈') : '';
+    const copy = opts.lines ? (opts.emoji + ' ' + opts.title + '\n' + opts.lines.join('\n') + '\n—— 光屿 · AI 旋律工坊') : '';
     body.querySelector('#btnSaveShareModal').addEventListener('click', () => {
       cv.toBlob(b => {
         if (!b) { toast('生成失败，请再试一次'); return; }
@@ -3236,7 +3271,7 @@
   const shareAffB = document.getElementById('shareAffirmation');
   if (shareAffB) shareAffB.addEventListener('click', () => {
     const t = (document.getElementById('affirmationText') || {}).textContent || '';
-    showShareModal({ emoji: '🌟', title: '今日肯定语', lines: [t, '—— 光屿 · 玄学疗愈'], accent: '#8a7bd8' });
+    showShareModal({ emoji: '🌟', title: '今日肯定语', lines: [t, '—— 光屿 · AI 旋律工坊'], accent: '#8a7bd8' });
   });
   const tarotShareB = document.getElementById('btnTarotShare');
   if (tarotShareB) tarotShareB.addEventListener('click', () => {
