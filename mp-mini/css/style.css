@@ -1017,3 +1017,8 @@ body { padding-bottom: 80px; }
 .share-card { margin: 4px 0 12px; }
 .share-card canvas { display: block; width: 100%; border-radius: 16px; box-shadow: 0 6px 20px rgba(139,107,172,.18); }
 .share-card-btns { display: flex; gap: 10px; justify-content: center; }
+
+/* Suno 导入区 */
+.suno-url-row { display: flex; gap: 8px; align-items: stretch; }
+.suno-url-row .lib-search { flex: 1 1 auto; min-width: 0; }
+.suno-url-row .btn { flex: 0 0 auto; white-space: nowrap; }

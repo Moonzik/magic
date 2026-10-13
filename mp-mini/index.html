@@ -178,13 +178,55 @@
         </div>
       </div>
 
+      <!-- AI 提示词生成（已并入 AI 板块） -->
+      <div class="card">
+        <div class="card-tag">✨ AI 提示词生成 · 原创编曲</div>
+        <p class="upload-hint">用一句话描述画面或情绪，AI 即时原创编曲——每次都不同、无版权风险。可指定乐器：钢琴 / 古筝 / 吉他 / 竖琴 / 弦乐 / 笛子 / 八音盒；还可写「白噪音大 / 白噪音小 / 无白噪音」「起伏大 / 平稳」「转调 / 稳定」。音调会自然游移、节奏不规则。</p>
+        <div class="form-group">
+          <input type="text" id="promptInput" class="lib-search" placeholder="描述你想要的旋律，如：宁静的雨夜钢琴曲" maxlength="60">
+        </div>
+        <div class="chip-group" id="promptQuick">
+          <button type="button" class="chip" data-prompt="雨夜的钢琴 平静放松 白噪音大">🌧 雨夜钢琴</button>
+          <button type="button" class="chip" data-prompt="古筝 森林晨光 鸟鸣 自然">🌲 古筝森林</button>
+          <button type="button" class="chip" data-prompt="弦乐 深海冥想 海浪 起伏大">🌊 弦乐深海</button>
+          <button type="button" class="chip" data-prompt="温暖治愈的吉他 舒缓 平稳">🎸 温暖吉他</button>
+          <button type="button" class="chip" data-prompt="活力希望的八音盒 明亮 转调">⚡ 八音盒希望</button>
+          <button type="button" class="chip" data-prompt="纯净的钢琴 无白噪音 稳定">🎹 纯净钢琴</button>
+        </div>
+        <div class="form-group">
+          <label>给这段旋律取名（可选）</label>
+          <input type="text" id="promptName" class="lib-search" placeholder="如：雨夜独白" maxlength="30">
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="btnPromptGen">✨ 生成专属旋律</button>
+      </div>
+
+      <!-- Suno 导入（混合方案：本地合成为主，可导入 Suno 作品） -->
+      <div class="card">
+        <div class="card-tag">🎚 用 Suno 创作并导入</div>
+        <p class="upload-hint">本地 AI 合成是默认主力；如果你在 Suno 做了歌，可把 mp3 下载后导入这里播放（纯前端，无需密钥）。也可粘贴 Suno 分享链接试试自动抓取。</p>
+        <div class="form-group">
+          <label>名称（可选）</label>
+          <input type="text" id="sunoName" class="lib-search" placeholder="如：我的 Suno 小样" maxlength="30">
+        </div>
+        <div class="form-group">
+          <label>粘贴 Suno 分享链接（可选，自动抓取）</label>
+          <div class="suno-url-row">
+            <input type="text" id="sunoUrl" class="lib-search" placeholder="https://suno.com/s/...">
+            <button type="button" class="btn btn-ghost" id="btnSunoUrl">抓取</button>
+          </div>
+          <small class="form-hint">若链接无法直接抓取（跨域限制），请到 Suno 下载 mp3 后点下方上传。</small>
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="btnSunoUpload">⬆ 上传 Suno 的 mp3 播放</button>
+        <input type="file" id="sunoFileInput" accept="audio/*,.mp3,.wav,.m4a,.ogg" style="display:none;">
+      </div>
+
       </div><!-- /musicCustom -->
 
       <!-- 旋律库（本地 AI 合成库 + 我的上传） -->
       <div id="musicLib">
       <div class="card">
         <div class="card-tag">🎵 旋律库</div>
-        <p class="upload-hint">本地 AI 合成的旋律库（26 首），按情绪 / 音色搜索与试听。也能上传你自己的 mp3 当背景旋律。</p>
+        <p class="upload-hint">本地 AI 合成的旋律库，每首都随机生成、不重样，按情绪 / 音色搜索与试听。也能上传你自己的 mp3 当背景旋律。</p>
         <div class="lib-tools">
           <input type="text" id="libSearch" class="lib-search" placeholder="搜索调性 / BPM / 情绪…">
           <div class="chip-group lib-filter" id="libFilterChips">

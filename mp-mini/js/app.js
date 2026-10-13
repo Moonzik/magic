@@ -563,29 +563,109 @@
       return { name: names[idx], config: STYLES[names[idx]] };
     }
 
-    // 生成旋律：优先改编公有领域名曲，约 22% 概率走原创旋律（保证每次不重样）
-    function melodyFromSeed(params) {
+    // ---- 节奏型库：[时值, 是否休止]，1 = 一个单位拍 ----
+    // 有「型」的节奏才叫律动（纯随机时值只会显得散）；休止带来切分与呼吸
+    const RHYTHM_CELLS = [
+      [[1,0],[1,0],[1,0],[1,0]],
+      [[0.5,0],[0.5,0],[1,0],[1,0],[1,0]],
+      [[1,0],[0.5,0],[0.5,0],[1,0],[1,0]],
+      [[1.5,0],[0.5,0],[1,0],[1,0]],
+      [[0.5,0],[0.5,0],[0.5,0],[0.5,0],[1,0],[1,0]],
+      [[1,0],[1,0],[0.5,0],[0.5,0],[1,0]],
+      [[2,0],[1,0],[1,0]],
+      [[0.75,0],[0.75,0],[0.5,0],[1,0],[1,0]],
+      [[0.5,0],[1,0],[0.5,0],[1,0],[1,0]],
+      [[1,0],[0.5,1],[0.5,0],[1,0],[1,0]],
+      [[1,0],[0.5,0],[1,1],[0.5,0],[1,0]],
+      [[0.5,0],[0.5,1],[1,0],[1,0],[1,0]],
+      [[1.5,0],[0.25,0],[0.25,0],[1,0],[1,0]],
+      [[0.5,0],[0.5,0],[1,0],[0.5,1],[0.5,0],[1,0]]
+    ];
+
+    function clampDeg(d) { while (d < 1) d += 7; while (d > 8) d -= 7; return d; }
+
+    // 生成一个旋律动机：跳进 + 级进混合，形成有轮廓、有记忆点的音型（而非平铺直叙的随机漫步）
+    function makeMotif(rand) {
+      const len = 4 + ((rand() * 3) | 0);
+      const steps = [-4,-3,-2,-1,-1,1,1,2,2,3,4];
+      const degs = [];
+      let d = 1 + ((rand() * 3) | 0);
+      for (let i = 0; i < len; i++) {
+        degs.push(clampDeg(d));
+        d += steps[(rand() * steps.length) | 0];
+      }
+      degs[len - 1] = 1 + ((rand() * 3) | 0);   // 动机收在主音区，轮廓更完整
+      return { degs, label: '原创动机' };
+    }
+
+    // 倒影：以首音为轴镜像音程（对比句用，与原型形成对比又同源）
+    function invertMotif(degs) {
+      const first = degs[0];
+      return degs.map(d => clampDeg(first - (d - first)));
+    }
+
+    // 节奏型变奏：偶尔拆音 / 并音 / 加留白 —— 每次出现都「似而不同」
+    function varyCell(cell, rand) {
+      const c = cell.map(x => [x[0], x[1]]);
+      const r = rand();
+      if (r < 0.30 && c.length > 2) {
+        const i = (rand() * c.length) | 0;
+        if (c[i][0] >= 1) c.splice(i, 1, [c[i][0] / 2, 0], [c[i][0] / 2, 0]);
+      } else if (r < 0.45 && c.length > 3) {
+        const i = (rand() * (c.length - 1)) | 0;
+        c.splice(i, 2, [c[i][0] + c[i + 1][0], 0]);
+      } else if (r < 0.58) {
+        c[(rand() * c.length) | 0][1] = 1;
+      }
+      return c;
+    }
+
+    // 主题发展式作曲：动机 × 节奏型 → A / A'(模进) / B(倒影) / A'' 乐句；旋律与节奏都不再单调
+    // original=true 时完全原创（不使用固定名曲 → 无版权风险）
+    function composeMelody(params, original) {
+      const rand = rng((params.seed ^ 0x9e3779b9) >>> 0);
+      const bars = (params.style && params.style.prog.length) || 4;
+      let motif, label;
       const names = GOAL_MOTIFS[params.goal] || GOAL_MOTIFS['内在平静'];
-      const rand = rng(params.seed ^ 0x9e3779b9);
-      const useMotif = names.length > 0 && rand() > 0.22;
-      if (useMotif) {
+      if (!original && names.length > 0 && rand() > 0.22) {
         const name = names[(rand() * names.length) | 0];
         const m = MELODY_MOTIFS[name];
-        return { label: m.vibe + '·' + name, seq: m.seq.slice() };
+        motif = { degs: m.seq.slice(0, 5) };
+        label = m.vibe + '·' + name + '（变奏）';
+      } else {
+        motif = makeMotif(rand);
+        label = '原创动机发展';
       }
-      // 原创：在音阶上随机漫步，形成自然旋律线
-      const len = 24;
-      const seq = [];
-      let deg = 1 + ((rand() * 3) | 0);
-      for (let i = 0; i < len; i++) {
-        seq.push(deg);
-        const step = [-2, -1, 1, 1, 2, 0][(rand() * 6) | 0];
-        deg += step;
-        if (deg < 1) deg = 1;
-        if (deg > 8) deg = 5;
-        if (rand() < 0.1) deg = 1;
+      const cellA = RHYTHM_CELLS[(rand() * RHYTHM_CELLS.length) | 0];
+      const cellB = RHYTHM_CELLS[(rand() * RHYTHM_CELLS.length) | 0];
+      const events = [];   // { deg, dur, rest, grace }
+      for (let b = 0; b < bars; b++) {
+        const isB = (b % 4 === 2);                   // 每 4 小节的第 3 小节用对比句
+        const cell = varyCell(isB ? cellB : cellA, rand);
+        let shift = 0;
+        if (b % 4 === 1) shift = 2;                  // 模进：二度上移
+        else if (b % 4 === 3) shift = -1;            // 回落
+        let degs = isB ? invertMotif(motif.degs) : motif.degs.map(d => clampDeg(d + shift));
+        if (b === bars - 1) degs = degs.slice(0, Math.max(2, degs.length - 1)).concat([1]); // 全曲收在主音
+        let di = 0;
+        for (let k = 0; k < cell.length && di < degs.length; k++) {
+          const dur = cell[k][0], isRest = !!cell[k][1];
+          if (isRest) { events.push({ deg: degs[di], dur, rest: true }); continue; }
+          let deg = degs[di];
+          if (rand() < 0.12) {                        // 偶尔八度大跳，拉开音域起伏
+            if (deg + 7 <= 9) deg += 7;
+            else if (deg - 7 >= 1) deg -= 7;
+          }
+          if (rand() < 0.14) {                        // 偶尔加一个装饰音（短倚音）
+            const grace = deg + (rand() < 0.5 ? -1 : 1);
+            if (grace >= 1 && grace <= 9) events.push({ deg: grace, dur: dur * 0.28, rest: false, grace: true });
+          }
+          events.push({ deg, dur, rest: false });
+          di++;
+        }
       }
-      return { label: '原创旋律', seq };
+      const seq = events.filter(e => !e.rest).map(e => e.deg);
+      return { label, seq, events };
     }
 
     // ---- 氛围特效音（全部程序化合成，零版权风险）----
@@ -610,10 +690,17 @@
         style = pickStyle(goal);
       }
       const params = { freq: +freq, beat, goal, seed: randomSeed(), styleName: style.name, style: style.config };
-      params.melody = melodyFromSeed(params);
+      params.melody = composeMelody(params, !!opts.original);
       params.fx = (opts.fx || []).filter(f => FX_META[f]);
       params.fxLabels = params.fx.map(f => FX_META[f].label);
       params.wish = opts.wish || '';
+      params.leadInst = opts.leadInst || defaultLeadInst(goal, style.name);
+      params.accInst = opts.accInst || (params.leadInst === 'guitar' || params.leadInst === 'harp' ? 'celesta' : 'harp');
+      params.counterInst = opts.counterInst || (params.leadInst === 'strings' ? 'flute' : 'strings');
+      // 白噪音底床音量 / 情绪起伏深度 / 音调游移强度（均可由提示词调整）
+      params.noiseLevel = (opts.noiseLevel != null) ? Math.max(0, Math.min(2, opts.noiseLevel)) : 0.7;
+      params.dynamics = (opts.dynamics != null) ? Math.max(0.2, Math.min(1.8, opts.dynamics)) : 1.0;
+      params.pitchWander = (opts.pitchWander != null) ? Math.max(0, Math.min(2, opts.pitchWander)) : 0.9;
       return params;
     }
 
@@ -730,6 +817,92 @@
       osc.connect(g); g.connect(dest);
       osc.start(t0);
       osc.stop(t0 + 2.1);
+    }
+
+    // ---- 多乐器音色库（全部为合成音色，零采样、零版权风险）----
+    // harms/hg：谐波结构与相对响度；mode：pluck(拨弦衰减) / sustain(持续带颤音)
+    // attack/release：起音与收尾；vibrato：颤音频率(Hz)；breath：气声比例(笛箫类)
+    const INSTRUMENTS = {
+      piano:   { type:'sine',     harms:[1,2,3,4,5,6,7],        hg:[1,0.55,0.28,0.14,0.07,0.035,0.02], attack:0.005, release:1.9, mode:'pluck',   vibrato:0, breath:0 },
+      harp:    { type:'sine',     harms:[1,2,3,4,5],             hg:[1,0.42,0.18,0.07,0.03],           attack:0.003, release:1.0, mode:'pluck',   vibrato:0, breath:0 },
+      guitar:  { type:'triangle', harms:[1,2,3,4],               hg:[1,0.45,0.20,0.09],                attack:0.004, release:0.85,mode:'pluck',   vibrato:0, breath:0 },
+      guzheng: { type:'triangle', harms:[1,2,3,4,5],             hg:[1,0.50,0.22,0.10,0.04],           attack:0.002, release:0.9, mode:'pluck',   vibrato:0, breath:0 },
+      strings: { type:'sine',     harms:[1,2,3,4],               hg:[1,0.32,0.14,0.06],                attack:0.30,  release:2.4, mode:'sustain', vibrato:5, breath:0 },
+      flute:   { type:'sine',     harms:[1,2,3],                 hg:[1,0.10,0.04],                     attack:0.10,  release:1.3, mode:'sustain', vibrato:5, breath:0.05 },
+      celesta: { type:'sine',     harms:[1,2.76,5.4,8.9],        hg:[1,0.50,0.26,0.12],                attack:0.002, release:1.5, mode:'pluck',   vibrato:0, breath:0 },
+      bell:    { type:'sine',     harms:[1,2.4,3.8,5.2],         hg:[1,0.42,0.22,0.10],                attack:0.002, release:2.6, mode:'pluck',   vibrato:0, breath:0 },
+      pad:     { type:'sine',     harms:[1,2,3,4],               hg:[1,0.22,0.10,0.04],                attack:1.6,   release:3.0, mode:'sustain', vibrato:3, breath:0 }
+    };
+
+    // 通用发声：按乐器音色合成一个音（支持谐波、起音/收尾包络、颤音、气声）
+    function playVoice(c, dest, f, t0, vol, instName, pan, dur) {
+      const inst = INSTRUMENTS[instName] || INSTRUMENTS.piano;
+      const panner = c.createStereoPanner();
+      panner.pan.value = pan || 0;
+      panner.connect(dest);
+      const noteDur = dur || inst.release;
+      const nodes = [];
+      inst.harms.forEach((h, i) => {
+        const osc = c.createOscillator();
+        osc.type = inst.type;
+        osc.frequency.value = f * h;
+        const g = c.createGain();
+        const amp = vol * (inst.hg[i] != null ? inst.hg[i] : 0);
+        if (inst.mode === 'sustain') {
+          const peak = Math.max(amp, 0.0001);
+          const sus = Math.max(peak * (inst.sustain != null ? inst.sustain : 0.7), 0.0001);
+          const hold = t0 + inst.attack + Math.min(0.1, noteDur * 0.2);
+          const susT = Math.max(noteDur, inst.attack + 0.2); // 保证事件时间严格递增，避免爆音
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(peak, t0 + inst.attack);
+          g.gain.setValueAtTime(peak, hold);
+          g.gain.exponentialRampToValueAtTime(sus, t0 + susT);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + susT + (inst.release || 0.4));
+          osc.start(t0); osc.stop(t0 + susT + (inst.release || 0.4) + 0.05);
+        } else {
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(Math.max(amp, 0.0001), t0 + inst.attack);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + noteDur);
+          osc.start(t0); osc.stop(t0 + noteDur + 0.2);
+        }
+        if (inst.vibrato) {
+          const lfo = c.createOscillator();
+          lfo.type = 'sine';
+          lfo.frequency.value = inst.vibrato;
+          const lg = c.createGain();
+          lg.gain.value = 4 + h * 1.5;
+          lfo.connect(lg); lg.connect(osc.detune);
+          lfo.start(t0); lfo.stop(t0 + noteDur + 0.5);
+          nodes.push(lfo);
+        }
+        osc.connect(g); g.connect(panner);
+        nodes.push(osc);
+      });
+      if (inst.breath) {
+        const noise = c.createBufferSource();
+        noise.buffer = getNoiseBuffer(c); noise.loop = true;
+        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * 2; bp.Q.value = 0.8;
+        const ng = c.createGain();
+        ng.gain.setValueAtTime(0.0001, t0);
+        ng.gain.exponentialRampToValueAtTime(Math.max(vol * inst.breath, 0.0001), t0 + inst.attack);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t0 + noteDur);
+        noise.connect(bp); bp.connect(ng); ng.connect(panner);
+        noise.start(t0); noise.stop(t0 + noteDur + 0.2);
+        nodes.push(noise);
+      }
+      return nodes;
+    }
+
+    // 根据目标/风格给出默认主奏乐器（让每段 AI 音乐自带合适音色）
+    function defaultLeadInst(goal, styleName) {
+      if (styleName) {
+        if (styleName.indexOf('钢琴') >= 0) return 'piano';
+        if (styleName.indexOf('民谣') >= 0) return 'guitar';
+        if (styleName.indexOf('氛围') >= 0) return 'celesta';
+        if (styleName.indexOf('治愈') >= 0) return 'harp';
+      }
+      const m = { '爱情':'piano', '财富':'guitar', '健康':'harp', '内在平静':'celesta', '事业':'piano' };
+      return m[goal] || 'piano';
     }
 
     // 连续层：根音 + 双耳节拍 + 白噪音（慢速淡入 + 呼吸感，音量约为伴奏的 30%，绝不刺耳）
@@ -896,53 +1069,179 @@
       }
     }
 
-    // 安排主旋律（名曲改编/原创）铺满整个循环：均匀节奏，保留原曲自然韵律
-    function scheduleLeadMelody(c, buses, params, t0, loopLen) {
+    // ---- 音调游移 / 不规则节奏 / 情绪起伏：让 AI 编曲不呆板 ----
+
+    // 逐小节转调：按音阶内的自然音程整体移调（和谐但音调不固定），概率随游移强度变化
+    function barTranspose(params, loopIndex, barIdx) {
+      const w = params.pitchWander == null ? 0.9 : params.pitchWander;
+      if (w <= 0.01) return 1;
+      const rand = rng((params.seed ^ 0x51ed270b ^ (((loopIndex || 0) * 2654435761) >>> 0) ^ ((barIdx + 1) * 40503)) >>> 0);
+      if (rand() > 0.30 * w) return 1;
+      const steps = [-3, -2, -1, 1, 1, 2, 2, 3];
+      return degreeRatio(1 + steps[(rand() * steps.length) | 0]);
+    }
+
+    // 情绪起伏：一段循环内的力度弧线（弱—强—收），起伏深度由 dynamics 控制
+    function dynamicsAt(params, pos, rand) {
+      const d = params.dynamics == null ? 1 : params.dynamics;
+      const p = Math.max(0, Math.min(1, pos));
+      const arc = 0.72 + 0.5 * Math.sin(Math.PI * Math.pow(p, 0.85));
+      const jit = 0.88 + (rand ? rand() * 0.24 : 0.12);
+      return Math.max(0.45, Math.min(1.9, (arc * jit - 1) * d + 1));
+    }
+
+    // 白噪音底床：音量由提示词控制（noiseLevel），4 秒淡入，并随情绪缓慢呼吸
+    function addNoiseBed(c, master, params, t) {
+      const lv = params.noiseLevel == null ? 0.7 : params.noiseLevel;
+      if (lv <= 0) return [];
+      const vol = Math.max(0.0001, 0.02 * lv);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 4);
+      const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 120;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4200;
+      const noise = c.createBufferSource();
+      noise.buffer = getNoiseBuffer(c); noise.loop = true;
+      noise.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master);
+      noise.start(t);
+      const src = [noise];
+      const d = params.dynamics == null ? 1 : params.dynamics;
+      const lfo = c.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = 0.07;
+      const amt = c.createGain(); amt.gain.value = vol * 0.35 * d;
+      lfo.connect(amt); amt.connect(g.gain);
+      lfo.start(t);
+      src.push(lfo);
+      return src;
+    }
+
+    // 安排主旋律：不规则时值（随机长短 + 偶尔留白）+ 逐小节转调 + 跟随情绪弧线的力度
+    function scheduleLeadMelody(c, buses, params, t0, loopLen, loopIndex) {
       const m = params.style;
       const base = params.freq;
-      const seq = params.melody.seq;
-      const n = seq.length;
-      const noteDur = loopLen / n;
-      seq.forEach((deg, i) => {
-        let f = base * degreeRatio(deg);
-        while (f > 900) f /= 2;
-        while (f < 130) f *= 2;
-        // 力度自然起伏：每 4 拍一个柔和重音，其余更轻，有呼吸感
-        const accent = (i % 4 === 0) ? 0.9 : 0.68;
-        // 高频响度补偿：音高越高听感越「尖」，按平方根衰减，高音不再刺耳突出
-        const hfComp = f > 520 ? Math.sqrt(520 / f) : 1;
-        // 声像温和左右交替（不随机乱跳，听起来更稳）
-        const pan = (i % 2 === 0) ? -0.28 : 0.28;
-        pluck(c, buses.lead, f, t0 + i * noteDur, m.arpVol * accent * hfComp, m.arpType, pan);
+      const events = melodyEvents(params);
+      const bars = m.prog.length || 4;
+      const rand = rng((params.seed ^ 0x1b56c4e9 ^ (((loopIndex || 0) * 7919) >>> 0)) >>> 0);
+      const leadInst = params.leadInst || 'piano';
+      // 用「作曲」给出的节奏型时值（含休止与倚音），归一化铺满循环
+      const total = events.reduce((a, e) => a + (e.dur || 1), 0) || 1;
+      const unit = loopLen / total;
+      let t = t0;
+      events.forEach((ev) => {
+        const dur = (ev.dur || 1) * unit;
+        if (!ev.rest && rand() > 0.03) {
+          const barIdx = Math.min(bars - 1, Math.floor(((t - t0) / loopLen) * bars));
+          const tr = barTranspose(params, loopIndex, barIdx);
+          let f = base * tr * degreeRatio(ev.deg);
+          while (f > 900) f /= 2;
+          while (f < 130) f *= 2;
+          const hfComp = f > 520 ? Math.sqrt(520 / f) : 1;
+          const dyn = dynamicsAt(params, (t - t0) / loopLen, rand);
+          // 装饰音更轻、骨干音更有分量，层次更清楚
+          const accent = (ev.grace ? 0.45 : 0.68) + rand() * 0.3;
+          const pan = (rand() * 2 - 1) * 0.34;
+          playVoice(c, buses.lead, f, t, m.arpVol * accent * hfComp * dyn * 0.92, leadInst, pan, dur * 0.92);
+        }
+        t += dur;
       });
     }
 
-    // 一个循环的「和弦铺底 + 低音 + 主旋律」
-    function scheduleMusicLoop(c, buses, params, t0) {
+    // 自动伴奏：分解和弦，时值不规则 + 随小节转调 + 力度跟随情绪弧线
+    function scheduleAccompaniment(c, buses, params, t0, loopLen, loopIndex) {
       const m = params.style;
       const base = params.freq;
       const barLen = m.bar;
+      const accInst = params.accInst || 'harp';
+      const count = (m.density >= 0.6) ? 5 : 4;
+      const rand = rng((params.seed ^ 0x27d4eb2f ^ (((loopIndex || 0) * 6151) >>> 0)) >>> 0);
+      m.prog.forEach((ch, bi) => {
+        const tr = barTranspose(params, loopIndex, bi);
+        const b = base * tr;
+        const mults = CHORDS[ch] || CHORDS.I;
+        const bt = t0 + bi * barLen;
+        const pattern = [mults[0], mults[1], mults[2], mults[0] * 2, mults[1] * 2];
+        const rel = [];
+        for (let k = 0; k < count; k++) rel.push(0.6 + rand() * 1.1);
+        const tot = rel.reduce((a, x) => a + x, 0) || 1;
+        const step = barLen / tot;
+        let t = bt;
+        for (let k = 0; k < count; k++) {
+          const d = rel[k] * step;
+          if (rand() > 0.05) {
+            let f = b * pattern[k % pattern.length];
+            while (f > 1000) f /= 2;
+            while (f < 130) f *= 2;
+            const dyn = dynamicsAt(params, (t - t0) / loopLen, rand);
+            const vol = (m.arpVol || 0.26) * 0.5 * dyn * (0.6 + rand() * 0.5);
+            playVoice(c, buses.pad, f, t, vol, accInst, (rand() * 2 - 1) * 0.4, d * 0.9);
+          }
+          t += d;
+        }
+      });
+    }
+
+    // 自动第二声部（和声）：主旋律上方三度，自己的不规则时值与转调，轻声衬托
+    function scheduleCounterMelody(c, buses, params, t0, loopLen, loopIndex) {
+      const base = params.freq;
+      const seq = params.melody.seq;
+      const n = seq.length;
+      const bars = params.style.prog.length || 4;
+      const cInst = params.counterInst || 'strings';
+      if (cInst === 'none') return;
+      const rand = rng((params.seed ^ 0x3c6ef372 ^ (((loopIndex || 0) * 104729) >>> 0)) >>> 0);
+      const rel = [];
+      for (let i = 0; i < n; i++) rel.push(0.8 + rand() * 1.4);
+      const tot = rel.reduce((a, x) => a + x, 0) || 1;
+      const unit = loopLen / tot;
+      let t = t0;
+      seq.forEach((deg, i) => {
+        const dur = rel[i] * unit;
+        if (i % 2 === 0 && rand() > 0.15) {
+          const barIdx = Math.min(bars - 1, Math.floor(((t - t0) / loopLen) * bars));
+          const tr = barTranspose(params, loopIndex, barIdx);
+          let f = base * tr * degreeRatio(deg + 2);
+          while (f > 900) f /= 2;
+          while (f < 130) f *= 2;
+          const dyn = dynamicsAt(params, (t - t0) / loopLen, rand);
+          const vol = 0.12 * dyn * (0.75 + rand() * 0.5);
+          playVoice(c, buses.lead, f, t, vol, cInst, (rand() * 2 - 1) * 0.35, dur * 1.3);
+        }
+        t += dur;
+      });
+    }
+
+    // 一个循环的「和弦铺底 + 低音 + 主旋律 + 自动伴奏 + 自动和声」（含逐小节转调与情绪起伏）
+    function scheduleMusicLoop(c, buses, params, t0, loopIndex) {
+      const m = params.style;
+      const base = params.freq;
+      const barLen = m.bar;
+      const loopLen = loopLength(params);
       m.prog.forEach((ch, i) => {
+        const tr = barTranspose(params, loopIndex, i);   // 逐小节转调，音调不固定
+        const b = base * tr;
         const mults = CHORDS[ch] || CHORDS.I;
         const t1 = t0 + i * barLen;
         const t2 = t1 + barLen;
+        const dyn = dynamicsAt(params, i / (m.prog.length || 4), null);
         // 低音线条：低八度根音（柔和拨弦，音量小、频率不低于 90Hz，避免低频嗡鸣）
-        let bassF = base * mults[0] / 2;
+        let bassF = b * mults[0] / 2;
         while (bassF < 90) bassF *= 2;
-        bassNote(c, buses.pad, bassF, t1, t2, 0.06);
+        bassNote(c, buses.pad, bassF, t1, t2, 0.06 * dyn);
         mults.forEach((mult, k) => {
-          const f = fitFreq(base * mult);
+          const f = fitFreq(b * mult);
           if (!f) return;
           const panner = c.createStereoPanner();
           panner.pan.value = (k % 2 ? 0.3 : -0.3);
           panner.connect(buses.pad);
-          padNote(c, panner, f, t1, t2, m.padVol, m.padType);
+          padNote(c, panner, f, t1, t2, m.padVol * dyn, m.padType);
         });
       });
-      // 主旋律铺满整个循环
-      scheduleLeadMelody(c, buses, params, t0, loopLength(params));
+      // 主旋律 / 自动伴奏 / 自动和声（都带不规则节奏、转调与情绪起伏）
+      scheduleLeadMelody(c, buses, params, t0, loopLen, loopIndex);
+      scheduleAccompaniment(c, buses, params, t0, loopLen, loopIndex);
+      scheduleCounterMelody(c, buses, params, t0, loopLen, loopIndex);
       // 氛围特效音脉冲事件（鸟鸣/风铃/金币/篝火爆裂）
-      scheduleFxAmbience(c, buses, params, t0, loopLength(params));
+      scheduleFxAmbience(c, buses, params, t0, loopLen);
     }
 
     // 搭建总图：连续层 + 和声/琶音总线 + 延迟回声 + 压缩器（防爆音）
@@ -979,7 +1278,19 @@
 
       const sources = addDroneLayer(c, master, params, t);
       const ambSources = addAmbienceLayer(c, master, params, t);
-      return { master, pad, lead, sources: sources.concat(ambSources) };
+      const noiseSources = addNoiseBed(c, master, params, t);
+
+      // 整体情绪起伏：极慢的音量涌动（深度由 dynamics 控制），让演奏有呼吸与张弛
+      const d = params.dynamics == null ? 1 : params.dynamics;
+      const swell = c.createOscillator();
+      swell.type = 'sine';
+      swell.frequency.value = 0.055;
+      const swellAmt = c.createGain();
+      swellAmt.gain.value = 0.12 * d;
+      swell.connect(swellAmt); swellAmt.connect(lead.gain); swellAmt.connect(pad.gain);
+      swell.start(t);
+
+      return { master, pad, lead, sources: sources.concat(ambSources, noiseSources, [swell]) };
     }
 
     function start(params) {
@@ -990,9 +1301,10 @@
       const g = buildBase(c, c.destination, params);
       const loopLen = loopLength(params);
       nextLoopTime = c.currentTime + 0.15;
+      let loopIdx = 0;
       const schedule = () => {
         while (nextLoopTime < c.currentTime + 1.5) {
-          scheduleMusicLoop(c, g, params, nextLoopTime);
+          scheduleMusicLoop(c, g, params, nextLoopTime, loopIdx++);
           nextLoopTime += loopLen;
         }
       };
@@ -1053,7 +1365,7 @@
       const loopLen = loopLength(params);
       const loops = Math.ceil(seconds / loopLen) + 1;
       for (let i = 0; i < loops; i++) {
-        scheduleMusicLoop(c, g, params, i * loopLen);
+        scheduleMusicLoop(c, g, params, i * loopLen, i);
       }
       const buf = await c.startRendering();
       return audioBufferToWav(buf);
@@ -1590,23 +1902,195 @@
     return div;
   }
 
+  // 提示词生成交互：输入框 + 快捷词 chip → 解析 → 随机合成专属旋律
+  const promptInputEl = document.getElementById('promptInput');
+  const promptGenBtn = document.getElementById('btnPromptGen');
+  if (promptGenBtn) promptGenBtn.addEventListener('click', () => {
+    const v = promptInputEl ? promptInputEl.value.trim() : '';
+    if (!v) { toast('请输入提示词，例如：雨夜的钢琴'); return; }
+    generateFromPrompt(v);
+  });
+  const promptQuickEl = document.getElementById('promptQuick');
+  if (promptQuickEl) promptQuickEl.addEventListener('click', (e) => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    const v = c.dataset.prompt || '';
+    if (promptInputEl) promptInputEl.value = v;
+    generateFromPrompt(v);
+  });
+
+  // ===== Suno 混合方案：本地合成为主，可导入用户在 Suno 生成的歌曲 =====
+  // 纯前端无法直连 Suno API（无官方 API、密钥不能放浏览器、跨域限制），
+  // 因此走「下载 mp3 上传」为主、「粘贴分享链接最佳努力抓取」为辅的导入通道，复用 playImported。
+  const sunoNameEl = document.getElementById('sunoName');
+  const sunoUrlEl = document.getElementById('sunoUrl');
+  const sunoFileInput = document.getElementById('sunoFileInput');
+  const btnSunoUpload = document.getElementById('btnSunoUpload');
+  const btnSunoUrl = document.getElementById('btnSunoUrl');
+
+  if (btnSunoUpload && sunoFileInput) {
+    btnSunoUpload.addEventListener('click', () => sunoFileInput.click());
+    sunoFileInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      const f = files[0];
+      const name = (sunoNameEl && sunoNameEl.value.trim()) || f.name.replace(/\.[^.]+$/, '') || 'Suno 作品';
+      try {
+        await MusicStore.put({ id: 'suno_' + Date.now(), name, fileName: f.name, goal: '内在平静', blob: f, addedAt: Date.now(), from: 'suno' });
+      } catch (err) {}
+      playImported({ name, goal: '内在平静', blob: f });
+      toast('已导入 Suno 作品，开始播放 🎚');
+      if (typeof renderLibrary === 'function') renderLibrary();
+      e.target.value = '';
+    });
+  }
+
+  if (btnSunoUrl && sunoUrlEl) {
+    btnSunoUrl.addEventListener('click', async () => {
+      const url = sunoUrlEl.value.trim();
+      if (!url) { toast('请先粘贴 Suno 分享链接'); return; }
+      toast('正在尝试抓取…');
+      try {
+        const resp = await fetch(url, { mode: 'cors' });
+        const blob = await resp.blob();
+        if (!blob || blob.size === 0) throw new Error('empty');
+        const name = (sunoNameEl && sunoNameEl.value.trim()) || 'Suno 作品';
+        try {
+          await MusicStore.put({ id: 'suno_' + Date.now(), name, fileName: name + '.mp3', goal: '内在平静', blob, addedAt: Date.now(), from: 'suno' });
+        } catch (err) {}
+        playImported({ name, goal: '内在平静', blob });
+        toast('已抓取并播放 🎚');
+        if (typeof renderLibrary === 'function') renderLibrary();
+      } catch (err) {
+        toast('链接无法直接抓取（跨域限制）。请到 Suno 下载 mp3，再用上方「上传」导入。');
+      }
+    });
+  }
+
+  // 一次只播放一种音乐：背景音乐 / 定制音乐 / 音乐库音乐 互斥，避免叠音
+  function stopOtherMusic(except) {
+    if (except !== 'splash') SplashMusic.pause();
+    if (except !== 'import' && importAudio && !importAudio.paused) importAudio.pause();
+    if (except !== 'synth' && SynthEngine.isPlaying()) SynthEngine.stop();
+  }
+
   function playTrack(t) {
     if (t.params) {
-      // 预置曲：合成引擎实时播放（含主题背景切换）
+      // 预置曲：每次播放都用新随机种子重新合成，保证同一首旋律库每听一次都不一样
+      stopOtherMusic('synth');
       SynthEngine.stop();
       ScriptureReader.stop();
-      const fxTxt = (t.fx && t.fx.length) ? ' · ' + t.fx.map(f => FX_ZH[f]).join(' + ') : '';
-      const sub = `${t.goal} · ${t.style} · ${t.freq}Hz${fxTxt}`;
-      // 预置曲附带该目标的一段经文（按 id 选段，稳定可复现）
-      const seed = (t.id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-      const scripture = pickScripture(t.goal, seed);
-      showPlayer('✨', t.name, sub + ' · 可播放或下载', 'synth', { params: t.params, scripture, scriptureAuto: false });
-      if (SynthEngine.start(t.params)) setPlayButton(true);
+      const beat = (t.params && t.params.beat) || 6;
+      const fresh = SynthEngine.makeParams(t.goal || (t.params && t.params.goal), t.freq || 432, beat, {
+        styleName: t.style || (t.params && t.params.styleName),
+        fx: t.fx || (t.params && t.params.fx)
+      });
+      const fxTxt = (fresh.fx && fresh.fx.length) ? ' · ' + fresh.fx.map(f => FX_ZH[f]).join(' + ') : '';
+      const sub = `${fresh.goal} · ${fresh.styleName} · ${fresh.freq}Hz${fxTxt}`;
+      showPlayer('✨', t.name, sub + ' · 随机生成 · 可播放或下载', 'synth', { params: fresh, scripture: [], scriptureAuto: false });
+      if (SynthEngine.start(fresh)) setPlayButton(true);
       MusicStore.incPlay(t.id);
       toast('正在播放 ✨');
     } else if (t.blob) {
       playImported(t);
     }
+  }
+
+  // ===== AI 提示词生成：把自然语言描述映射为合成参数，每次随机生成专属旋律 =====
+  function parsePrompt(text) {
+    text = (text || '').toLowerCase();
+    // 目标情绪（与预置曲库一致的中文 key）
+    let goal = '内在平静';
+    if (/(爱情|恋|浪漫|心动|表白|甜蜜)/.test(text)) goal = '爱情';
+    else if (/(财富|钱|金|丰盛|富足|好运|招财|顺利)/.test(text)) goal = '财富';
+    else if (/(健康|身体|自然|森林|鸟|氧气|晨光|阳光)/.test(text)) goal = '健康';
+    else if (/(活力|动感|快乐|希望|欢快|明亮|积极|向上)/.test(text)) goal = '事业';
+    else if (/(事业|工作|学习|专注|努力|成功|突破|进阶)/.test(text)) goal = '事业';
+    else if (/(平静|放松|冥想|睡眠|安眠|宁静|雨|海|浪|溪|湖|静|疗愈|舒缓)/.test(text)) goal = '内在平静';
+    // 风格
+    let styleName = null;
+    if (/(钢琴|琴)/.test(text)) styleName = '钢琴叙事';
+    else if (/(民谣|吉他|木)/.test(text)) styleName = '轻快民谣';
+    else if (/(流行)/.test(text)) styleName = /(清新|轻快)/.test(text) ? '清新流行' : '浪漫流行';
+    else if (/(氛围|空灵|悠远)/.test(text)) styleName = '空灵氛围';
+    else if (/(治愈|温暖|安抚)/.test(text)) styleName = '温暖治愈';
+    // 频率
+    let freq = 432;
+    if (/(528|治愈|睡眠|深睡|疗愈)/.test(text)) freq = 528;
+    else if (/(639|希望|清晰|高频|通透)/.test(text)) freq = 639;
+    else if (/(396|释放|解脱)/.test(text)) freq = 396;
+    // 未指定时从更宽的调性池里随机取，让每次生成的音调起点也不一样
+    else { const pool = [396, 417, 432, 444, 528, 639, 741, 852]; freq = pool[(Math.random() * pool.length) | 0]; }
+    // 特效层
+    const fx = [];
+    if (/(雨|细雨|雨夜|落雨)/.test(text)) fx.push('rain');
+    if (/(海|浪|海浪|潮汐)/.test(text)) fx.push('waves');
+    if (/(溪|流|河流)/.test(text)) fx.push('stream');
+    if (/(火|篝火|炭)/.test(text)) fx.push('fire');
+    if (/(鸟|鸟鸣|莺)/.test(text)) fx.push('birds');
+    if (/(风铃|铃)/.test(text)) fx.push('chime');
+    if (/(金|钱|币|金币)/.test(text)) fx.push('coins');
+    // 主奏乐器（用户可指定；自动编曲会用互补乐器写伴奏与和声）
+    let leadInst = null;
+    if (/(钢琴|琴键|piano)/.test(text)) leadInst = 'piano';
+    else if (/(古筝|筝)/.test(text)) leadInst = 'guzheng';
+    else if (/(吉他|guitar)/.test(text)) leadInst = 'guitar';
+    else if (/(竖琴|harp)/.test(text)) leadInst = 'harp';
+    else if (/(弦乐|小提琴|大提|提琴|strings|管弦)/.test(text)) leadInst = 'strings';
+    else if (/(笛|箫|长笛|flute)/.test(text)) leadInst = 'flute';
+    else if (/(八音|八音盒|音乐盒|celesta)/.test(text)) leadInst = 'celesta';
+    else if (/(铃|钟|bell)/.test(text)) leadInst = 'bell';
+    if (!leadInst) {
+      const moodInst = { '爱情':'piano', '财富':'guitar', '健康':'harp', '内在平静':'celesta', '事业':'piano' };
+      leadInst = moodInst[goal] || 'piano';
+    }
+    const accInst = (leadInst === 'guitar' || leadInst === 'harp') ? 'celesta' : 'harp';
+    const counterInst = (leadInst === 'strings') ? 'flute' : (leadInst === 'flute' ? 'strings' : 'strings');
+    // 白噪音底床音量：「白噪音大/小/无」等
+    let noiseLevel = 0.7;
+    if (/(无噪|没有噪音|不要噪音|关闭噪音|不要白噪|纯净|安静无声)/.test(text)) noiseLevel = 0;
+    else if (/(白噪|白杂|噪音|噪声|底噪|沙沙|noise)/.test(text)) {
+      if (/(大|强|多|重|明显|满|很)/.test(text)) noiseLevel = 1.5;
+      else if (/(小|弱|少|轻|微|淡|一点)/.test(text)) noiseLevel = 0.35;
+      else noiseLevel = 1.0;
+    } else if (goal === '内在平静' || /(冥想|睡眠|安眠|专注|深睡)/.test(text)) noiseLevel = 0.85;
+    // 情绪起伏深度：「起伏大/澎湃/平稳/均匀」
+    let dynamics = 1.0;
+    if (/(起伏大|大起伏|张弛|跌宕|渐强|高潮|戏剧|澎湃|波澜|强烈)/.test(text)) dynamics = 1.5;
+    else if (/(平稳|平缓|一致|均匀|无起伏|不起伏|安静|很静|柔和|淡然)/.test(text)) dynamics = 0.55;
+    // 音调游移强度：「转调/多变/稳定」
+    let pitchWander = 0.9;
+    if (/(转调|变调|调性变化|游移|音调变化|不规律|多变|跳跃)/.test(text)) pitchWander = 1.5;
+    else if (/(固定|稳定|单一|不转调|保持|不要转调)/.test(text)) pitchWander = 0.3;
+    const beat = (goal === '事业' || goal === '财富') ? 6 : (goal === '健康' ? 7 : 6);
+    const title = text.length > 16 ? text.slice(0, 16) + '…' : text;
+    return { goal, styleName, freq, fx, beat, title, leadInst, accInst, counterInst, noiseLevel, dynamics, pitchWander };
+  }
+
+  function generateFromPrompt(text) {
+    const p = parsePrompt(text);
+    // original:true → 强制原创旋律（不套用固定名曲），配合多乐器自动编曲，彻底规避版权风险
+    const fresh = SynthEngine.makeParams(p.goal, p.freq, p.beat, {
+      styleName: p.styleName, fx: p.fx, original: true,
+      leadInst: p.leadInst, accInst: p.accInst, counterInst: p.counterInst,
+      noiseLevel: p.noiseLevel, dynamics: p.dynamics, pitchWander: p.pitchWander
+    });
+    stopOtherMusic('synth');
+    SynthEngine.stop();
+    ScriptureReader.stop();
+    const fxTxt = (fresh.fx && fresh.fx.length) ? ' · ' + fresh.fx.map(f => FX_ZH[f]).join(' + ') : '';
+    const sub = `${fresh.goal} · ${fresh.styleName} · ${fresh.freq}Hz${fxTxt}`;
+    const instZh = { piano:'钢琴', guitar:'吉他', guzheng:'古筝', harp:'竖琴', strings:'弦乐', flute:'长笛', celesta:'八音盒', bell:'风铃' };
+    const noiseTxt = fresh.noiseLevel <= 0 ? '无白噪音'
+      : (fresh.noiseLevel >= 1.2 ? '白噪音较强' : (fresh.noiseLevel <= 0.5 ? '白噪音轻微' : '白噪音适中'));
+    const dynTxt = fresh.dynamics >= 1.3 ? '情绪起伏明显' : (fresh.dynamics <= 0.7 ? '平稳舒缓' : '自然起伏');
+    const wanderTxt = fresh.pitchWander >= 1.2 ? '调性多变（会转调）' : (fresh.pitchWander <= 0.5 ? '调性稳定' : '调性自然游移');
+    const note = `AI 原创编曲：以${instZh[fresh.leadInst] || '钢琴'}主奏，自动配分解和弦伴奏与${instZh[fresh.counterInst] || '弦乐'}和声；${wanderTxt}、节奏不规则，${dynTxt}，${noiseTxt}。全部由算法实时合成，无采样、无版权风险。可播放或下载 30 秒试听。`;
+    const promptNameEl = document.getElementById('promptName');
+    const pname = promptNameEl ? promptNameEl.value.trim() : '';
+    const title = pname || '提示词旋律';
+    showPlayer('✨', title, sub + ' · AI 原创编曲 · 可播放或下载', 'synth', { params: fresh, scripture: [], scriptureAuto: false, note });
+    if (SynthEngine.start(fresh)) setPlayButton(true);
+    toast('已为你生成专属旋律 ✨');
   }
 
   // ===== 经文伴读（TTS 朗读 + 逐行高亮，无中文嗓音时退化为定时器高亮）=====
@@ -1646,7 +2130,7 @@
       document.getElementById('playerNote').textContent = '正在播放你导入的伴奏（循环播放）· 可下载原文件';
     } else {
       currentTrack = { type: 'synth', icon, title, sub, params: extra.params, scripture: extra.scripture || [], scriptureAuto: !!extra.scriptureAuto };
-      document.getElementById('playerNote').textContent = '已合成定制旋律：改编/原创旋律 + 和弦伴奏 + 温暖背景音打底，可播放或下载 30 秒试听片段';
+      document.getElementById('playerNote').textContent = (extra && extra.note) || '已合成定制旋律：原创/改编旋律 + 自动伴奏与和声 + 温暖背景音打底，可播放或下载 30 秒试听片段';
     }
     ScriptureReader.render(currentTrack.scripture);
     if (currentTrack.scriptureAuto && currentTrack.scripture.length) {
@@ -1713,6 +2197,7 @@
         SplashMusic.resume();   // 停止定制 Sub，恢复主页配乐
       } else {
         SplashMusic.pause();    // 播放定制 Sub，先关掉主页配乐避免叠音
+        SynthEngine.stop();     // 确保不与合成乐叠加
         a.play().then(() => setPlayButton(true)).catch(() => toast('播放失败，请重试'));
       }
       return;
@@ -1724,6 +2209,7 @@
       SplashMusic.resume();     // 停止定制 Sub，恢复主页配乐
     } else {
       SplashMusic.pause();      // 播放定制 Sub，先关掉主页配乐避免叠音
+      if (importAudio && !importAudio.paused) importAudio.pause();  // 确保不与导入乐叠加
       if (SynthEngine.start(currentTrack.params)) {
         setPlayButton(true);
         toast('正在播放 ✨');
@@ -2168,7 +2654,7 @@
       importAudio = new Audio();
       importAudio.loop = true;
       importAudio.addEventListener('ended', () => setPlayButton(false));
-      importAudio.addEventListener('pause', () => { setPlayButton(false); if (!(SynthEngine.isPlaying())) SplashMusic.resume(); });
+      importAudio.addEventListener('pause', () => setPlayButton(false));
       importAudio.addEventListener('play', () => setPlayButton(true));
       // 把导入伴奏接入统一混音上下文，使肯定语女声能叠在同一声场、真正融合（不支持 Web Audio 时自动退回直放）
       const mc = getMixCtx();
@@ -2178,6 +2664,7 @@
   }
 
   function playImported(t) {
+    stopOtherMusic('import');
     SynthEngine.stop();               // 停止合成引擎，避免叠音
     const a = getImportAudio();
     if (importAudioUrl) URL.revokeObjectURL(importAudioUrl);
@@ -2806,7 +3293,11 @@
   if (audioToggle) audioToggle.addEventListener('click', () => {
     const m = !SplashMusic.isMuted();
     SplashMusic.setMute(m); store.muted = m; saveStore(store); updateAudioIcon();
-    if (!SplashMusic.isStarted() && !m) SplashMusic.start();
+    if (!m) {
+      // 开启背景音时，停掉定制音乐 / 音乐库音乐，避免与背景音同时播放
+      stopOtherMusic('splash');
+      if (!SplashMusic.isStarted()) SplashMusic.start();
+    }
     toast(m ? '已静音 🔇' : '背景音已开启 🔊');
   });
   updateAudioIcon();
