@@ -197,15 +197,24 @@
           <label>给这段旋律取名（可选）</label>
           <input type="text" id="promptName" class="lib-search" placeholder="如：雨夜独白" maxlength="30">
         </div>
+        <div class="gen-source" id="genSource">
+          <button type="button" class="seg active" data-src="local">本地合成</button>
+          <button type="button" class="seg" data-src="suno">🎚 Suno</button>
+        </div>
         <button type="button" class="btn btn-primary btn-block" id="btnPromptGen">✨ 生成专属旋律</button>
       </div>
 
-      <!-- Suno 导入（混合方案：本地合成为主，可导入 Suno 作品） -->
+      <!-- Suno 创作（混合方案：本地合成为主，可选接 Suno 后端代理生成） -->
       <div class="card">
-        <div class="card-tag">🎚 用 Suno 创作并导入</div>
-        <p class="upload-hint">本地 AI 合成是默认主力；如果你在 Suno 做了歌，可把 mp3 下载后导入这里播放（纯前端，无需密钥）。也可粘贴 Suno 分享链接试试自动抓取。</p>
+        <div class="card-tag">🎚 用 Suno 创作（后端代理）</div>
+        <p class="upload-hint">想「一键生成」Suno，需要你部署一个代持密钥的小代理（Cloudflare Worker，密钥只存在你的 Worker 里，浏览器永不接触）。部署好后在下方填地址，再用上方「🎚 Suno」按钮直接生成。也支持手动上传 mp3 / 粘贴链接导入。</p>
         <div class="form-group">
-          <label>名称（可选）</label>
+          <label>你的 Suno 代理地址（Cloudflare Worker 地址）</label>
+          <input type="text" id="sunoProxy" class="lib-search" placeholder="https://你的-worker.workers.dev">
+          <small class="form-hint">代理代码已放项目 suno-proxy/worker.js；部署步骤问我。地址会保存在本机。</small>
+        </div>
+        <div class="form-group">
+          <label>名称（可选，用于上传 / 链接导入）</label>
           <input type="text" id="sunoName" class="lib-search" placeholder="如：我的 Suno 小样" maxlength="30">
         </div>
         <div class="form-group">
@@ -833,6 +842,15 @@
 
   <!-- Toast 提示 -->
   <div class="toast" id="toast"></div>
+
+  <!-- Suno 生成中遮罩 -->
+  <div id="sunoGenOverlay" class="suno-overlay" style="display:none;">
+    <div class="suno-overlay-box">
+      <div class="suno-spinner"></div>
+      <div id="sunoGenText">Suno 生成中…</div>
+      <div class="suno-overlay-hint">通常在 30–60 秒，请稍候</div>
+    </div>
+  </div>
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>

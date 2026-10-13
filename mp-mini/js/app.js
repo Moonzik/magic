@@ -1902,20 +1902,38 @@
     return div;
   }
 
-  // 提示词生成交互：输入框 + 快捷词 chip → 解析 → 随机合成专属旋律
+  // 提示词生成交互：输入框 + 快捷词 chip → 解析 → 随机合成专属旋律 / 或走 Suno 代理生成
   const promptInputEl = document.getElementById('promptInput');
   const promptGenBtn = document.getElementById('btnPromptGen');
+  let genSource = 'local';
+  const genSourceEl = document.getElementById('genSource');
+  if (genSourceEl) {
+    const savedSrc = localStorage.getItem('genSource');
+    if (savedSrc === 'suno' || savedSrc === 'local') {
+      genSource = savedSrc;
+      genSourceEl.querySelectorAll('.seg').forEach(s => s.classList.toggle('active', s.dataset.src === savedSrc));
+    }
+    genSourceEl.addEventListener('click', (e) => {
+      const b = e.target.closest('.seg'); if (!b) return;
+      genSource = b.dataset.src;
+      genSourceEl.querySelectorAll('.seg').forEach(s => s.classList.toggle('active', s === b));
+      localStorage.setItem('genSource', genSource);
+    });
+  }
+  function getPromptName() { const el = document.getElementById('promptName'); return el ? el.value.trim() : ''; }
   if (promptGenBtn) promptGenBtn.addEventListener('click', () => {
     const v = promptInputEl ? promptInputEl.value.trim() : '';
     if (!v) { toast('请输入提示词，例如：雨夜的钢琴'); return; }
-    generateFromPrompt(v);
+    if (genSource === 'suno') generateWithSuno(v, getPromptName());
+    else generateFromPrompt(v);
   });
   const promptQuickEl = document.getElementById('promptQuick');
   if (promptQuickEl) promptQuickEl.addEventListener('click', (e) => {
     const c = e.target.closest('.chip'); if (!c) return;
     const v = c.dataset.prompt || '';
     if (promptInputEl) promptInputEl.value = v;
-    generateFromPrompt(v);
+    if (genSource === 'suno') generateWithSuno(v, getPromptName());
+    else generateFromPrompt(v);
   });
 
   // ===== Suno 混合方案：本地合成为主，可导入用户在 Suno 生成的歌曲 =====
@@ -1964,6 +1982,78 @@
         toast('链接无法直接抓取（跨域限制）。请到 Suno 下载 mp3，再用上方「上传」导入。');
       }
     });
+  }
+
+  // Suno 代理地址持久化（仅存本机 localStorage，密钥在用户自己的 Worker 里，不下发）
+  const sunoProxyEl = document.getElementById('sunoProxy');
+  if (sunoProxyEl) {
+    const savedProxy = localStorage.getItem('sunoProxy');
+    if (savedProxy) sunoProxyEl.value = savedProxy;
+    sunoProxyEl.addEventListener('input', () => {
+      localStorage.setItem('sunoProxy', sunoProxyEl.value.trim());
+    });
+  }
+
+  // ===== Suno 后端代理生成（混合方案中的「真·API 接入」）=====
+  // 前端把提示词发给用户自己的 Cloudflare Worker 代理，由代理调第三方网关生成并轮询，
+  // 拿到音频后通过代理回传，绕开浏览器跨域 + 密钥不下发到浏览器。
+  function getSunoProxy() {
+    const el = document.getElementById('sunoProxy');
+    const v = (el && el.value.trim()) || localStorage.getItem('sunoProxy') || '';
+    return v.replace(/\/+$/, '');
+  }
+  function showGenOverlay(text) {
+    const ov = document.getElementById('sunoGenOverlay');
+    if (ov) {
+      const t = document.getElementById('sunoGenText');
+      if (t && text) t.textContent = text;
+      ov.style.display = 'flex';
+    }
+  }
+  function hideGenOverlay() {
+    const ov = document.getElementById('sunoGenOverlay');
+    if (ov) ov.style.display = 'none';
+  }
+  async function generateWithSuno(prompt, name) {
+    const proxy = getSunoProxy();
+    if (!proxy) { toast('请先在「🎚 用 Suno 创作」卡片填写你的代理地址'); return; }
+    const safeName = name || 'Suno 作品';
+    const sunoSleep = (ms) => new Promise(r => setTimeout(r, ms));
+    showGenOverlay('Suno 生成中…');
+    try {
+      const gen = await fetch(proxy + '/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, instrumental: true, model: 'chirp-v3-5' })
+      });
+      const gj = await gen.json().catch(() => ({}));
+      if (!gj.ok || !gj.ids || !gj.ids.length) throw new Error('Suno 未返回任务（检查代理/密钥是否配置）');
+      const ids = gj.ids;
+      let audioUrl = null;
+      const maxTries = 40; // 最多约 3.5 分钟
+      for (let i = 0; i < maxTries; i++) {
+        showGenOverlay('Suno 生成中… (' + (i + 1) + '/' + maxTries + ')');
+        await sunoSleep(5000);
+        const st = await fetch(proxy + '/status?ids=' + encodeURIComponent(ids.join(',')));
+        const sj = await st.json().catch(() => ({}));
+        const ready = (sj.clips || []).find(c => c.audioUrl && c.status === 'complete');
+        if (ready) { audioUrl = ready.audioUrl; break; }
+      }
+      if (!audioUrl) throw new Error('Suno 生成超时，请稍后在 Suno 查看，或用「上传 mp3」导入');
+      const audioResp = await fetch(proxy + '/audio?u=' + encodeURIComponent(audioUrl));
+      if (!audioResp.ok) throw new Error('音频拉取失败');
+      const blob = await audioResp.blob();
+      if (!blob || blob.size === 0) throw new Error('音频内容为空');
+      const rec = { id: 'suno_' + Date.now(), name: safeName, fileName: safeName + '.mp3', goal: '内在平静', blob, addedAt: Date.now(), from: 'suno' };
+      try { await MusicStore.put(rec); } catch (e) {}
+      hideGenOverlay();
+      playImported({ name: safeName, goal: '内在平静', blob });
+      toast('Suno 生成完成，开始播放 🎚');
+      if (typeof renderLibrary === 'function') renderLibrary();
+    } catch (e) {
+      hideGenOverlay();
+      toast((e && e.message) || 'Suno 生成失败');
+    }
   }
 
   // 一次只播放一种音乐：背景音乐 / 定制音乐 / 音乐库音乐 互斥，避免叠音
